@@ -1,12 +1,19 @@
 #![no_std]
 #![no_main]
-#![feature(custom_test_frameworks)]
-#![test_runner(osdev::test_runner)]
+#![feature(custom_test_frameworks, abi_x86_interrupt)]
+#![test_runner(kernel::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
 use core::panic::PanicInfo;
-use osdev::{vgaeprintln, eprintln, vgaprintln};
+use kernel::{error, vgaprintln, vgaeprintln};
 
+
+fn main() -> ! {
+    kernel::init();
+
+    vgaprintln!("Hello,{}!", "World");
+    loop {}
+}
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
@@ -19,22 +26,18 @@ pub extern "C" fn _start() -> ! {
     }
 }
 
-fn main() -> ! {
-    vgaprintln!("Hello,{}!", "World");
-    loop {}
-}
 
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     vgaeprintln!("{}", info);
-    eprintln!("{}", info);
+    error!("{}", info);
     loop {}
 }
 #[cfg(test)]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    osdev::test_panic_handler(info)
+    kernel::test_panic_handler(info)
 }
 
 #[test_case]

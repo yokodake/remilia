@@ -3,7 +3,7 @@
 #![feature(custom_test_frameworks)]
 
 use core::panic::PanicInfo;
-use osdev::{QEMU_FAILURE, QEMU_SUCCESS, exit_qemu, println, print};
+use kernel::{QEMU_FAILURE, QEMU_SUCCESS, exit_qemu, println, print};
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {

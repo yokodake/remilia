@@ -1,0 +1,10 @@
+[package]
+name = "sakuya"
+version = "0.0.1"
+license = "BSD-3"
+authors = ["Yokodake <yokodake@cinnabar.fr"]
+description = "std-like library for remilia"
+repository = "https://github.com/yokodake/remilia"
+edition = "2018"
+
+[dependencies]

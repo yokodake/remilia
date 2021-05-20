@@ -26,8 +26,13 @@ pub enum Colour
   , White
   }
 impl Colour {
+    #[inline]
+    pub fn as_u8(self) -> u8 {
+        self as u8
+    }
+    #[inline]
     pub fn from_u8(num : u8) -> Colour {
-        if num > (Colour::White as u8) {
+        if num > Colour::White.as_u8() {
             Colour::White
         } else {
             unsafe { mem::transmute::<u8, Colour>(num) }
@@ -41,7 +46,7 @@ pub struct ColourCode(u8);
 
 impl ColourCode {
     pub fn new(fg: Colour, bg: Colour) -> ColourCode {
-        ColourCode((bg as u8) << 4 | (fg as u8))
+        ColourCode(bg.as_u8() << 4 | fg.as_u8())
     }
 
     pub fn bg(&self) -> Colour {
@@ -51,10 +56,10 @@ impl ColourCode {
         Colour::from_u8(self.0 & 0x0fu8)
     }
     pub fn with_fg(&self, fg: Colour) -> ColourCode {
-        ColourCode((self.0 & 0xf0) | (fg as u8))
+        ColourCode((self.0 & 0xf0) | fg.as_u8())
     }
     pub fn with_bg(&self, bg: Colour) -> ColourCode {
-        ColourCode((self.0 & 0x0f) | ((bg as u8) << 4))
+        ColourCode((self.0 & 0x0f) | (bg.as_u8() << 4))
     }
 }
 
@@ -160,7 +165,7 @@ impl fmt::Write for Writer {
 
 #[macro_export]
 macro_rules! vgaprint {
-    ($($arg:tt)*) => ($crate::vga_buffer::_vgaprint(format_args!($($arg)*)));
+    ($($arg:tt)*) => ($crate::vga::_vgaprint(format_args!($($arg)*)));
 }
 
 #[macro_export]
@@ -171,7 +176,7 @@ macro_rules! vgaprintln {
 #[macro_export]
 macro_rules! vgaeprintln {
     ($($arg:tt)*) => ({
-        use $crate::vga_buffer::{VGA_WRITER, Colour};
+        use $crate::vga::{VGA_WRITER, Colour};
         let cc = VGA_WRITER.lock().get_colour();
         VGA_WRITER.lock().set_colour(cc.with_fg(Colour::Red));
         $crate::vgaprintln!($($arg)*);

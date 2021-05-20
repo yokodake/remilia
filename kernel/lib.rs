@@ -1,15 +1,26 @@
 #![no_std]
 #![cfg_attr(test, no_main)]
-#![feature(custom_test_frameworks)]
+#![feature(custom_test_frameworks
+          ,abi_x86_interrupt)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-pub mod vga_buffer;
+pub mod vga;
 pub mod serial;
 pub mod debug;
+pub mod interrupts;
+pub mod gdt;
 
 use core::panic::PanicInfo;
 
+pub fn init() {
+    gdt::init();
+    interrupts::init_idt();
+    interrupts::init_pic();
+    x86_64::instructions::interrupts::enable();
+}
+
+/** TESTING */
 pub trait Testable {
     fn test_name(&self) -> &'static str;
     fn run(&self, align_to: usize) -> ();
@@ -26,7 +37,6 @@ impl<T: Fn()> Testable for T {
     }
 
 }
-
 pub fn test_runner(tests: &[&dyn Testable]) {
     use core::cmp::max;
     println!("Running {} tests\n", tests.len());
@@ -41,16 +51,18 @@ pub fn test_runner(tests: &[&dyn Testable]) {
 }
 
 pub fn test_panic_handler(info: &PanicInfo) -> ! {
-    eprintln!("[failed]\n");
-    eprintln!("Error: {}", info);
+    error!("[failed]\n");
+    error!("Error: {}", info);
     exit_qemu(QEMU_FAILURE);
     loop {}
 }
 
+/** ENTRY POINTS */
 /// `cargo test` entry point
 #[cfg(test)]
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
+    init();
     test_main();
     loop {}
 }
