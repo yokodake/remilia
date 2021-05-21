@@ -2,8 +2,8 @@ use core::u8;
 
 use spin::Mutex;
 
-pub static PICS: Mutex<DualPic> =
-    Mutex::new(unsafe{ DualPic::new(MASTER_PIC_OFFSET, SLAVE_PIC_OFFSET)});
+pub static PICS: Mutex<CascadePic> =
+    Mutex::new(unsafe{ CascadePic::new(MASTER_PIC_OFFSET, SLAVE_PIC_OFFSET)});
 
 pub fn init_pic() {
     unsafe { PICS.lock().initialize() };
@@ -13,11 +13,12 @@ pub const SLAVE_PIC_OFFSET : u8 = MASTER_PIC_OFFSET + 8;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
-pub enum InterruptIndex {
-    Timer = MASTER_PIC_OFFSET,
-}
+pub enum IRQ 
+    { Timer = MASTER_PIC_OFFSET
+    , Keyboard
+    }
 
-impl InterruptIndex {
+impl IRQ {
     #[inline]
     pub fn as_u8(self) -> u8 {
         self as u8
@@ -32,14 +33,14 @@ use x86_64::instructions::port::Port;
 
 const CMD_INIT : u8 = 0x11;
 const CMD_EOI : u8 = 0x20;
-const MODE_x86 : u8 = 0x01;
-pub struct DualPic 
+const MODE_86 : u8 = 0x01;
+pub struct CascadePic 
     { master : Pic
     , slave : Pic
     }
-impl DualPic {
-    pub const unsafe fn new(offset_master: u8, offset_slave :u8) -> DualPic {
-        DualPic {
+impl CascadePic {
+    pub const unsafe fn new(offset_master: u8, offset_slave :u8) -> CascadePic {
+        CascadePic {
             master: Pic {
                 command: Port::new(0x20),
                 data: Port::new(0x21),
@@ -76,9 +77,9 @@ impl DualPic {
         wait();
 
         // set x86 mode
-        self.master.data.write(MODE_x86);
+        self.master.data.write(MODE_86);
         wait();
-        self.slave.data.write(MODE_x86);
+        self.slave.data.write(MODE_86);
         wait();
 
         // restore masks
@@ -105,6 +106,10 @@ impl DualPic {
         } else if self.slave.handles_interrupt(interrupt_id) {
             self.slave.eoi();
         }
+    }
+    pub unsafe fn disable(&mut self) {
+        self.master.data.write(0xff);
+        self.slave.data.write(0xff);
     }
 }
 struct Pic 
