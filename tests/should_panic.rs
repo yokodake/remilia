@@ -11,7 +11,7 @@ pub extern "C" fn _start() -> ! {
     println!("[test did non panic]");
     exit_qemu(QEMU_FAILURE);
 
-    loop {}
+    kernel::halt()
 }
 
 fn should_fail() {
@@ -23,5 +23,5 @@ fn should_fail() {
 fn panic(_info: &PanicInfo) -> ! {
     println!("[ok]");
     exit_qemu(QEMU_SUCCESS);
-    loop {}
+    kernel::halt()
 }

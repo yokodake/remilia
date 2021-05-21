@@ -27,7 +27,7 @@ pub fn init_test_idt() {
 extern "x86-interrupt" fn test_double_fault_handler(_: InterruptStackFrame, _:u64) -> ! {
     println!("[ok]");
     exit_qemu(QEMU_SUCCESS);
-    loop {}
+    kernel::halt()
 }
 
 #[allow(unconditional_recursion)]

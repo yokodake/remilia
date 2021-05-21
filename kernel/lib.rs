@@ -5,11 +5,12 @@
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-pub mod vga;
-pub mod serial;
 pub mod debug;
-pub mod interrupts;
+pub mod devices;
 pub mod gdt;
+pub mod interrupts;
+pub mod serial;
+pub mod vga;
 
 use core::panic::PanicInfo;
 
@@ -18,6 +19,10 @@ pub fn init() {
     interrupts::init_idt();
     interrupts::init_pic();
     x86_64::instructions::interrupts::enable();
+}
+
+pub fn halt() -> ! {
+    loop { x86_64::instructions::hlt(); }
 }
 
 /** TESTING */
@@ -54,7 +59,7 @@ pub fn test_panic_handler(info: &PanicInfo) -> ! {
     error!("[failed]\n");
     error!("Error: {}", info);
     exit_qemu(QEMU_FAILURE);
-    loop {}
+    halt()
 }
 
 /** ENTRY POINTS */
@@ -64,7 +69,7 @@ pub fn test_panic_handler(info: &PanicInfo) -> ! {
 pub extern "C" fn _start() -> ! {
     init();
     test_main();
-    loop {}
+    halt()
 }
 
 #[cfg(test)]

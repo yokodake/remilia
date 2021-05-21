@@ -12,7 +12,7 @@ fn main() -> ! {
     kernel::init();
 
     vgaprintln!("Hello,{}!", "World");
-    loop {}
+    kernel::halt()
 }
 
 #[no_mangle]
@@ -20,7 +20,7 @@ pub extern "C" fn _start() -> ! {
     if cfg!(test) {
         #[cfg(test)]
         test_main();
-        loop {}
+        kernel::halt()
     } else {
         main();
     }
@@ -32,7 +32,7 @@ pub extern "C" fn _start() -> ! {
 fn panic(info: &PanicInfo) -> ! {
     vgaeprintln!("{}", info);
     error!("{}", info);
-    loop {}
+    kernel::halt()
 }
 #[cfg(test)]
 #[panic_handler]
