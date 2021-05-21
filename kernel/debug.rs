@@ -48,8 +48,9 @@ pub const ERROR_STYLE : TermStyle = TermStyle::fg(TermColour::Red).with_mode(Ter
 
 #[macro_export]
 macro_rules! _println_style {
-    ($style:expr, $fmt:expr $(, $arg:tt)*) =>
-        ($crate::devices::serial::_serial_print_with_style(& $style, format_args!(concat!($fmt, "\n"), $($arg ,)*)));
+    ($style:expr) => ($crate::devices::serial::_serial_print_with_style(& $style, format_args_nl!()));
+    ($style:expr, $($args:tt)*) =>
+        ($crate::devices::serial::_serial_print_with_style(& $style, format_args_nl!($($args)*)));
 }
 
 #[macro_export]
@@ -66,9 +67,9 @@ macro_rules! warn {
 }
 #[macro_export]
 macro_rules! error {
-    // () => {
-    //     $crate::_println_style!($crate::debug::ERROR_STYLE, "[ERROR @ {}:{}]", file!(), line!());
-    // };
+    () => {
+        $crate::_println_style!($crate::debug::ERROR_STYLE, "[ERROR @ {}:{}]", file!(), line!());
+    };
     ($($arg:tt)*) => {
         ($crate::_println_style!($crate::debug::ERROR_STYLE, $($arg)*));
     };

@@ -3,10 +3,13 @@ use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::gdt::{GlobalDescriptorTable, Descriptor, SegmentSelector};
 use lazy_static::lazy_static;
 
+use crate::info;
+
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 
 pub fn init() {
     use x86_64::instructions::{segmentation::set_cs, tables::load_tss};
+    info!("initializing GDT");
     GDT.0.load();
     unsafe {
         set_cs(GDT.1.code);

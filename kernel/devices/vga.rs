@@ -89,13 +89,16 @@ pub struct Writer
   , pub buffer: &'static mut Buffer
   }
 lazy_static! {
-pub static ref VGA_WRITER : Mutex<Writer> =
+pub static ref VGA_WRITER : Mutex<Writer> = {
+        let addr = 0xb8000;
+        crate::info!("loading VGA buffer @ 0x{:x}", addr);
         Mutex::new(Writer {
             col: 0,
             row: 0,
             colour_code: ColourCode::new(Colour::Yellow, Colour::Black),
-            buffer: unsafe {&mut *(0xb8000 as *mut Buffer)}
-        });
+            buffer: unsafe {&mut *(addr as *mut Buffer)}
+        })
+    };
 }
 
 impl Writer {

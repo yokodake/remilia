@@ -1,6 +1,9 @@
 #![no_std]
 #![no_main]
-#![feature(custom_test_frameworks, abi_x86_interrupt)]
+#![feature( custom_test_frameworks
+          , abi_x86_interrupt
+          , format_args_nl
+          )]
 #![test_runner(kernel::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
@@ -10,16 +13,15 @@ use kernel::{error, vgaprintln, vgaeprintln};
 
 fn main() -> ! {
     kernel::init();
-
+    kernel::info!("init done.");
     vgaprintln!("Hello,{}!", "World");
 
-    kernel::println!("helloooooooo");
-    kernel::println!("Hello,{}!", "World");
-    kernel::warn!("warn,{}!", "World");
-    kernel::error!("{}, {}!", "error", "World");
-    kernel::info!("info:");
-    kernel::dbg!(1+3);
+    use x86_64::registers::control::Cr3;
+    let (l4_pt, _) = Cr3::read();
+    vgaprintln!("Level 4 page table at: 0x{:x}", l4_pt.start_address());
 
+
+    kernel::info!("entering halt...");
     kernel::halt()
 }
 

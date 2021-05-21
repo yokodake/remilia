@@ -6,6 +6,7 @@ pub static PICS: Mutex<CascadePic> =
     Mutex::new(unsafe{ CascadePic::new(MASTER_PIC_OFFSET, SLAVE_PIC_OFFSET)});
 
 pub fn init_pic() {
+    info!("initializing Cascading PIC");
     unsafe { PICS.lock().initialize() };
 }
 pub const MASTER_PIC_OFFSET : u8 = 32;
@@ -30,6 +31,8 @@ impl IRQ {
 }
 
 use x86_64::instructions::port::Port;
+
+use crate::info;
 
 const CMD_INIT : u8 = 0x11;
 const CMD_EOI : u8 = 0x20;

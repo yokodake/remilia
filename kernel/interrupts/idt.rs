@@ -1,7 +1,7 @@
-use crate::{println, vgaprint};
+use crate::{error, info};
 use crate::gdt;
 use crate::interrupts::pic::{IRQ};
-use x86_64::structures::idt::{HandlerFunc, InterruptDescriptorTable, InterruptStackFrame};
+use x86_64::structures::idt::{HandlerFunc, InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 use lazy_static::lazy_static;
 use spin::Mutex;
 
@@ -18,19 +18,25 @@ pub fn init_idt() {
             idt.double_fault.set_handler_fn(double_fault_handler)
                 .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
         }
+        idt.page_fault.set_handler_fn(page_fault_handler);
         for (irq, handler) in IRQ_HANDLERS {
             idt[irq.as_usize()].set_handler_fn(handler);
         }
         idt
     };}
+    info!("loading IDT");
     IDT.load();
 }
 
 extern "x86-interrupt" fn breakpoint_handler(sf: InterruptStackFrame) {
-    println!("EXCEPTION: BREAKPOINT\n{:#?}", sf);
+    error!("EXCEPTION: BREAKPOINT");
 }
 extern "x86-interrupt" fn double_fault_handler(sf: InterruptStackFrame, _error_code: u64) -> ! {
-    panic!("EXCEPTION: DOUBLE FAULT\n{:#?}\n", sf);
+    panic!("EXCEPTION: DOUBLE FAULT! dumping stackframe\n{:#?}\n", sf);
+}
+extern "x86-interrupt" fn page_fault_handler(sf: InterruptStackFrame, ecode: PageFaultErrorCode) {
+    use x86_64::registers::control::Cr2;
+    panic!("EXCEPTION: PAGEFAULT @ 0x{:x} `{:?}`\n{:#?}\n", Cr2::read(), ecode, sf);
 }
 extern "x86-interrupt" fn timer_handler(_: InterruptStackFrame) {
     unsafe {

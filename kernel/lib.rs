@@ -1,7 +1,9 @@
 #![no_std]
 #![cfg_attr(test, no_main)]
-#![feature(custom_test_frameworks
-          ,abi_x86_interrupt)]
+#![feature( custom_test_frameworks
+          , abi_x86_interrupt
+          , format_args_nl
+          )]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
@@ -16,6 +18,7 @@ pub fn init() {
     gdt::init();
     interrupts::init_idt();
     interrupts::init_pic();
+    info!("enabling IRQ");
     x86_64::instructions::interrupts::enable();
 }
 
