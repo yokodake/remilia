@@ -166,18 +166,18 @@ impl fmt::Write for Writer {
 
 #[macro_export]
 macro_rules! vgaprint {
-    ($($arg:tt)*) => ($crate::vga::_vgaprint(format_args!($($arg)*)));
+    ($($arg:tt)*) => ($crate::devices::vga::_vgaprint(format_args!($($arg)*)));
 }
 
 #[macro_export]
 macro_rules! vgaprintln {
-    () => ($crate::vgaprint!("{}\n"));
+    () => ($crate::devices::vgaprint!("{}\n"));
     ($($arg:tt)*) => ($crate::vgaprint!("{}\n", format_args!($($arg)*)));
 }
 #[macro_export]
 macro_rules! vgaeprintln {
     ($($arg:tt)*) => ({
-        use $crate::vga::{VGA_WRITER, Colour};
+        use $crate::devices::vga::{VGA_WRITER, Colour};
         let cc = VGA_WRITER.lock().get_colour();
         VGA_WRITER.lock().set_colour(cc.with_fg(Colour::Red));
         $crate::vgaprintln!($($arg)*);

@@ -12,6 +12,14 @@ fn main() -> ! {
     kernel::init();
 
     vgaprintln!("Hello,{}!", "World");
+
+    kernel::println!("helloooooooo");
+    kernel::println!("Hello,{}!", "World");
+    kernel::warn!("warn,{}!", "World");
+    kernel::error!("{}, {}!", "error", "World");
+    kernel::info!("info:");
+    kernel::dbg!(1+3);
+
     kernel::halt()
 }
 

@@ -9,8 +9,6 @@ pub mod debug;
 pub mod devices;
 pub mod gdt;
 pub mod interrupts;
-pub mod serial;
-pub mod vga;
 
 use core::panic::PanicInfo;
 

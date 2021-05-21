@@ -1,3 +1,5 @@
+use sakuya::ansi_term::{TermColour, TermGMode, TermStyle};
+
 // see: https://doc.rust-lang.org/src/std/macros.rs.html#285-307
 #[macro_export]
 macro_rules! dbg {
@@ -25,12 +27,10 @@ macro_rules! dbg {
     };
 }
 
-use sakuya::TermColour;
-
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {
-        $crate::serial::_serial_print(format_args!($($arg)*));
+        $crate::devices::serial::_serial_print(format_args!($($arg)*));
     };
 }
 
@@ -42,24 +42,34 @@ macro_rules! println {
         ($crate::print!(concat!($fmt, "\n"), $($arg)*));
 }
 
+pub const INFO_STYLE : TermStyle = TermStyle::fg(TermColour::Cyan);
+pub const WARN_STYLE : TermStyle = TermStyle::fg(TermColour::Yellow);
+pub const ERROR_STYLE : TermStyle = TermStyle::fg(TermColour::Red).with_mode(TermGMode::Bold);
+
+#[macro_export]
+macro_rules! _println_style {
+    ($style:expr, $fmt:expr $(, $arg:tt)*) =>
+        ($crate::devices::serial::_serial_print_with_style(& $style, format_args!(concat!($fmt, "\n"), $($arg ,)*)));
+}
+
 #[macro_export]
 macro_rules! info {
     ($($arg:tt)*) => {
-        $crate::println!($($arg)*);
+        $crate::_println_style!($crate::debug::INFO_STYLE, $($arg)*);
     }
 }
-
 #[macro_export]
 macro_rules! warn {
     ($($arg:tt)*) => {
-        $crate::println!($($arg)*);
+        $crate::_println_style!($crate::debug::WARN_STYLE, $($arg)*);
     };
 }
-
 #[macro_export]
 macro_rules! error {
+    // () => {
+    //     $crate::_println_style!($crate::debug::ERROR_STYLE, "[ERROR @ {}:{}]", file!(), line!());
+    // };
     ($($arg:tt)*) => {
-        // TODO change color
-        $crate::println!($($arg)*);
+        ($crate::_println_style!($crate::debug::ERROR_STYLE, $($arg)*));
     };
 }
