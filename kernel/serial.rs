@@ -1,7 +1,7 @@
 use uart_16550::SerialPort;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use crate::vga::Colour;
+use x86_64::instructions::interrupts;
 
 lazy_static! {
     pub static ref SERIAL1: Mutex<SerialPort> = {
@@ -14,6 +14,8 @@ lazy_static! {
 #[doc(hidden)]
 pub fn _serial_print(args: ::core::fmt::Arguments) {
     use core::fmt::Write;
-    // FIXME: panic! will print to SERIAL1
-    SERIAL1.lock().write_fmt(args).expect("Printing to serial failed!");
+
+    interrupts::without_interrupts(|| {
+        SERIAL1.lock().write_fmt(args).unwrap();
+    });
 }

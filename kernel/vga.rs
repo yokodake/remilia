@@ -3,6 +3,7 @@ use core::fmt;
 use volatile::Volatile;
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
+use x86_64::instructions::interrupts;
 use core::mem;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -187,5 +188,7 @@ macro_rules! vgaeprintln {
 #[doc(hidden)]
 pub fn _vgaprint(args: fmt::Arguments) {
     use core::fmt::Write;
-    VGA_WRITER.lock().write_fmt(args).unwrap();
+    interrupts::without_interrupts(||{
+        VGA_WRITER.lock().write_fmt(args).unwrap();
+    });
 }
