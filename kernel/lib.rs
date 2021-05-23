@@ -7,6 +7,7 @@
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_harness_main"]
 
+extern crate alloc;
 pub mod debug;
 pub mod devices;
 pub mod gdt;
@@ -19,8 +20,13 @@ use bootloader::BootInfo;
 use bootloader::entry_point;
 use x86_64::VirtAddr;
 
+trait GlobalResource {
+    fn init();
+    fn the() -> &'static Self;
+}
+
 pub fn init() {
-    gdt::init();
+    gdt::Gdt::init();
     interrupts::init_idt();
     interrupts::init_pic();
     info!("enabling IRQ");
