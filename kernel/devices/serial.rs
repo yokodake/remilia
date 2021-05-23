@@ -24,6 +24,7 @@ pub fn _serial_print(args: ::core::fmt::Arguments) {
 }
 
 #[doc(hidden)]
+#[cfg(not(test))]
 pub fn _serial_print_with_style(style: &TermStyle, args: ::core::fmt::Arguments) {
     interrupts::without_interrupts(|| {
         let mut guard = SERIAL1.lock();
@@ -33,6 +34,9 @@ pub fn _serial_print_with_style(style: &TermStyle, args: ::core::fmt::Arguments)
         _serial_print_style(&mut guard.0, &old_style);
     });
 }
+#[doc(hidden)]
+#[cfg(test)]
+pub fn _serial_print_with_style(_: &TermStyle, _: ::core::fmt::Arguments) {}
 
 #[doc(hidden)]
 pub fn _serial_serial_set_style(style: &TermStyle) {

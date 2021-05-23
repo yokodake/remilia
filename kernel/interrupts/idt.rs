@@ -1,9 +1,8 @@
-use crate::{error, info};
+use crate::info;
 use crate::gdt;
 use crate::interrupts::pic::{IRQ};
 use x86_64::structures::idt::{HandlerFunc, InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 use lazy_static::lazy_static;
-use spin::Mutex;
 
 const IRQ_HANDLERS: [(IRQ, HandlerFunc); 2] =
     [ (IRQ::Timer, timer_handler)
@@ -28,9 +27,8 @@ pub fn init_idt() {
     IDT.load();
 }
 
-extern "x86-interrupt" fn breakpoint_handler(sf: InterruptStackFrame) {
-    error!("EXCEPTION: BREAKPOINT");
-}
+extern "x86-interrupt" fn breakpoint_handler(_: InterruptStackFrame) {}
+
 extern "x86-interrupt" fn double_fault_handler(sf: InterruptStackFrame, _error_code: u64) -> ! {
     panic!("EXCEPTION: DOUBLE FAULT! dumping stackframe\n{:#?}\n", sf);
 }

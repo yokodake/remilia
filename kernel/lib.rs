@@ -5,14 +5,19 @@
           , format_args_nl
           )]
 #![test_runner(crate::test_runner)]
-#![reexport_test_harness_main = "test_main"]
+#![reexport_test_harness_main = "test_harness_main"]
 
 pub mod debug;
 pub mod devices;
 pub mod gdt;
 pub mod interrupts;
+pub mod vmem;
 
 use core::panic::PanicInfo;
+use bootloader::BootInfo;
+#[cfg(test)]
+use bootloader::entry_point;
+use x86_64::VirtAddr;
 
 pub fn init() {
     gdt::init();
@@ -20,6 +25,19 @@ pub fn init() {
     interrupts::init_pic();
     info!("enabling IRQ");
     x86_64::instructions::interrupts::enable();
+}
+
+pub fn main(boot_info: &'static BootInfo) -> ! {
+    init();
+    info!("init done.");
+    // vgaprintln!("Hello,{}!", "World");
+
+    let pmem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let mut _mapper = unsafe { vmem::init(pmem_offset) };
+    let mut _frame_allocator = unsafe { vmem::BootInfoFrameAllocator::init(&boot_info.memory_map) };
+
+    info!("entering halt...");
+    halt()
 }
 
 pub fn halt() -> ! {
@@ -63,13 +81,16 @@ pub fn test_panic_handler(info: &PanicInfo) -> ! {
     halt()
 }
 
-/** ENTRY POINTS */
-/// `cargo test` entry point
+/* ENTRY POINTS */
+
+#[cfg(test)]
+entry_point!(test_main);
 #[cfg(test)]
 #[no_mangle]
-pub extern "C" fn _start() -> ! {
+/// `cargo test` entry point
+pub fn test_main(_boot_info: &'static BootInfo) -> ! {
     init();
-    test_main();
+    test_harness_main();
     halt()
 }
 
