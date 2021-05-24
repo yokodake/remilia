@@ -4,38 +4,35 @@
           , abi_x86_interrupt
           , format_args_nl
           )]
-#![test_runner(kernel::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-use bootloader::{BootInfo, entry_point};
-
-entry_point!(start);
-
-fn start(boot_info: &'static BootInfo) -> ! {
-    if cfg!(test) {
-        #[cfg(test)]
-        test_main();
-        kernel::halt()
-    } else {
-        kernel::main(boot_info);
+fn hello() {
+    let video = 0xb8000 as *mut u16;
+    unsafe {
+        video.offset(0).write(0x0240);
+        video.offset(1).write(0x0268); // h
+        video.offset(2).write(0x026e); // e
+        video.offset(3).write(0x026c); // l
+        video.offset(4).write(0x026c); // l
     }
+}
+
+#[no_mangle]
+pub fn rust_main() -> ! {
+    hello();
+    hang()
 }
 
 use core::panic::PanicInfo;
 
-#[cfg(not(test))]
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    kernel::vgaeprintln!("{}", info);
-    kernel::error!("{}", info);
-    kernel::halt()
+fn panic(_: &PanicInfo) -> ! {
+    hang()
 }
-#[cfg(test)]
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    kernel::test_panic_handler(info)
+
+fn hang() -> ! {
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
-#[test_case]
-fn valid() {
-    assert_eq!(1, 1);
-}
+
