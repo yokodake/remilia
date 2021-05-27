@@ -8,7 +8,7 @@ repository = "https://github.com/yokodake/remilia"
 edition = "2018"
 
 [workspace]
-members = [ "sakuya" ]
+members = [ "patchouli" ]
 
 [lib]
 path = "kernel/lib.rs"
@@ -19,7 +19,7 @@ path = "kernel/main.rs"
 name = "remilia"
 
 [dependencies]
-sakuya = { path = "./sakuya" }
+pache = { path = "./patchouli" }
 bootloader = { version = "0.9.17", features = ["map_physical_memory"] }
 volatile = "0.2.6"
 lazy_static = { version = "1.4", features = ["spin_no_std"] }
@@ -38,7 +38,9 @@ name = "stack_overflow"
 harness = false
 
 [package.metadata.bootimage]
-run-command = ["qemu-system-x86_64", "-drive", "format=raw,file={}", "-serial", "stdio"]
+run-command = ["qemu-system-x86_64", "-drive", "format=raw,file={}", "-serial", "stdio", "-m", "512M"]
 test-args = ["-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-display", "none"]
 test-success-exit-code = 33
+[package.metadata.bootloader]
+physical-memory-offset = "0x18000000000" # 0x0180_0000_0000 
 

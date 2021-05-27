@@ -2,18 +2,23 @@ pub mod paging;
 
 use core::usize;
 
+use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 use x86_64::structures::paging::{FrameAllocator, OffsetPageTable, PhysFrame, Size4KiB};
 use x86_64::{PhysAddr, VirtAddr}; 
+
+use crate::info;
 use paging::PAGE_SIZE;
+
 
 /// init a new OffsetPageTable with the l4frame's physical addr and the offset.
 ///
 /// SAFETY: caller must guarantee complete pmem. is mapped to vmem. at the passed `pmem_offset`.
 /// Also, only call once because of `&mut` aliasing.
 pub unsafe fn init(pmem_offset: VirtAddr) -> OffsetPageTable<'static> {
+    info!("identity mapping at offset {:p}", pmem_offset);
     let phys = l4frame().start_address();
     let virt : VirtAddr = pmem_offset + phys.as_u64();
-    
+    info!("mapping PL4: V{:p} -> P{:p}", virt, phys);
     OffsetPageTable::new(&mut *(virt.as_mut_ptr()), pmem_offset)
 }
 
@@ -36,17 +41,7 @@ pub fn create_example_mapping(
         .expect("map_to failed")
         .flush();
 }
-
 */
-
-pub struct EmptyFrameAllocator;
-unsafe impl FrameAllocator<Size4KiB> for EmptyFrameAllocator {
-    fn allocate_frame(&mut self) -> Option<PhysFrame<Size4KiB>> {
-        None
-    }
-}
-
-use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 
 pub struct BootInfoFrameAllocator {
     memory_map: &'static MemoryMap,
@@ -56,12 +51,20 @@ impl BootInfoFrameAllocator {
     /// SAFETY: This function is unsafe because the caller must guarantee that the passed
     /// memory map is valid. The main requirement is that all frames that are marked
     /// as `USABLE` in it are really unused.
-    pub unsafe fn init(memory_map: &'static MemoryMap) -> Self {
+    pub unsafe fn new(memory_map: &'static MemoryMap) -> Self {
+        #[cfg(not(release))]
+        for region in memory_map.iter() {
+            info!( "Multiboot mmap: [0x{:012x} : 0x{:012x}] {:?}"
+                 , region.range.start_addr()
+                 , region.range.end_addr()
+                 , region.region_type );
+        }
         BootInfoFrameAllocator {
             memory_map, 
             next: 0
         }
     }
+    // FIXME this sucks, we should (1) cache this and (2) deallocate pages
     fn usable_frames(&self) -> impl Iterator<Item = PhysFrame> {
         self.memory_map.iter() 
             // get usable regions

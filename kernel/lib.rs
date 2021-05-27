@@ -13,12 +13,15 @@ pub mod devices;
 pub mod gdt;
 pub mod interrupts;
 pub mod vmem;
+pub mod heap;
+pub mod locked;
 
 use core::panic::PanicInfo;
 use bootloader::BootInfo;
 #[cfg(test)]
 use bootloader::entry_point;
 use x86_64::VirtAddr;
+use alloc::boxed::Box;
 
 trait GlobalResource {
     fn init();
@@ -39,8 +42,25 @@ pub fn main(boot_info: &'static BootInfo) -> ! {
     // vgaprintln!("Hello,{}!", "World");
 
     let pmem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    let mut _mapper = unsafe { vmem::init(pmem_offset) };
-    let mut _frame_allocator = unsafe { vmem::BootInfoFrameAllocator::init(&boot_info.memory_map) };
+    let mut mapper = unsafe { vmem::init(pmem_offset) };
+    let mut frame_allocator = unsafe { 
+        vmem::BootInfoFrameAllocator::new(&boot_info.memory_map) 
+    };
+
+    unsafe { 
+        heap::init(&mut mapper, &mut frame_allocator)
+            .expect("failed to init kernel heap");
+    }
+
+    let mut x = Box::new(13);
+    println!("{}", x);
+    *x = 42;
+    println!("{}", x);
+
+    for _ in 1..1000000 {
+    }
+
+
 
     info!("entering halt...");
     halt()

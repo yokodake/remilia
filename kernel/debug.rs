@@ -1,4 +1,4 @@
-use sakuya::ansi_term::{TermColour, TermGMode, TermStyle};
+use pache::ansi_term::{TermColour, TermGMode, TermStyle};
 
 // see: https://doc.rust-lang.org/src/std/macros.rs.html#285-307
 #[macro_export]
