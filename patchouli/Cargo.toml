@@ -9,3 +9,7 @@ edition = "2018"
 
 [dependencies]
 spin = "*"
+x86_64 = "*"
+
+[profile.test.dependencies]
+rand = "*"

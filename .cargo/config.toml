@@ -1,9 +1,9 @@
 [unstable]
-build-std-features = ["compiler-builtins-mem"] # FIXME
-build-std = ["core", "compiler_builtins", "alloc"]
+# build-std-features = ["compiler-builtins-mem"] # FIXME
+# build-std = ["core", "compiler_builtins", "alloc"]
 
 [build]
-target = ".cargo/x86_64-remilia.json"
+# target = ".cargo/x86_64-remilia.json"
 
-[target.'cfg(target_os = "none")']
+[target.'cfg(target_os = "remilia")']
 runner = "bootimage runner"

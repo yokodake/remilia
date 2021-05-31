@@ -3,6 +3,7 @@
 #![feature(custom_test_frameworks)]
 #![test_runner(kernel::test_runner)]
 #![reexport_test_harness_main = "test_main"]
+#![feature(default_alloc_error_handler)]
 
 use kernel::println;
 

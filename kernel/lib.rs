@@ -3,9 +3,11 @@
 #![feature( custom_test_frameworks
           , abi_x86_interrupt
           , format_args_nl
+          , asm
           )]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_harness_main"]
+#![cfg_attr(test, feature(default_alloc_error_handler))]
 
 extern crate alloc;
 pub mod debug;
@@ -17,50 +19,56 @@ pub mod heap;
 pub mod locked;
 
 use core::panic::PanicInfo;
-use bootloader::BootInfo;
+use bootloader::{BootInfo, bootinfo::MemoryMap};
 #[cfg(test)]
-use bootloader::entry_point;
+use bootloader::{entry_point};
 use x86_64::VirtAddr;
 use alloc::boxed::Box;
 
-trait GlobalResource {
+pub trait GlobalResource {
     fn init();
     fn the() -> &'static Self;
 }
 
-pub fn init() {
+pub fn debug_regions(memory_map: &'static MemoryMap) {
+    for region in memory_map.iter() {
+        info!( "Multiboot mmap: [0x{:012x} : 0x{:012x}] {:?}"
+                , region.range.start_addr()
+                , region.range.end_addr()
+                , region.region_type );
+    }
+}
+
+pub fn init(boot_info: &'static BootInfo) {
+    use heap::BootstrapFramesAlloc;
     gdt::Gdt::init();
     interrupts::init_idt();
     interrupts::init_pic();
     info!("enabling IRQ");
     x86_64::instructions::interrupts::enable();
-}
-
-pub fn main(boot_info: &'static BootInfo) -> ! {
-    init();
-    info!("init done.");
-    // vgaprintln!("Hello,{}!", "World");
-
+    info!("CPU init done.");
     let pmem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { vmem::init(pmem_offset) };
-    let mut frame_allocator = unsafe { 
-        vmem::BootInfoFrameAllocator::new(&boot_info.memory_map) 
+    debug_regions(&boot_info.memory_map);
+    let mut bootstrap = match BootstrapFramesAlloc::new(&boot_info.memory_map) {
+        Some(x) => x,
+        None => {
+            error!("Could not find enough memory for initial heap");
+            panic!()
+        }
     };
 
-    unsafe { 
-        heap::init(&mut mapper, &mut frame_allocator)
+
+    unsafe {
+        heap::init(&mut mapper, &mut bootstrap)
             .expect("failed to init kernel heap");
     }
+    info!("memory enabled");
+}
 
-    let mut x = Box::new(13);
-    println!("{}", x);
-    *x = 42;
-    println!("{}", x);
-
-    for _ in 1..1000000 {
-    }
-
-
+pub fn main() -> ! {
+    let world = Box::new("World");
+    vgaprintln!("Hello, {}!", world);
 
     info!("entering halt...");
     halt()
@@ -114,8 +122,8 @@ entry_point!(test_main);
 #[cfg(test)]
 #[no_mangle]
 /// `cargo test` entry point
-pub fn test_main(_boot_info: &'static BootInfo) -> ! {
-    init();
+pub fn test_main(boot_info: &'static BootInfo) -> ! {
+    init(boot_info);
     test_harness_main();
     halt()
 }

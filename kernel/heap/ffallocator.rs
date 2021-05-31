@@ -2,7 +2,7 @@
 
 use core::{alloc::{GlobalAlloc, Layout}, mem, ptr::{self, NonNull}};
 
-use pache::mem::align_up;
+use pache::addr::Addr;
 
 use crate::locked::Locked;
 
@@ -12,7 +12,7 @@ pub struct Region {
     next: *mut Region,
     size: usize
 }
-impl Region { 
+impl Region {
     const fn null() -> *mut Region { ptr::null_mut() }
     fn begin(&self) -> *const Region  {
         self as *const Self

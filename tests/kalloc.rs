@@ -14,16 +14,11 @@ use alloc::{boxed::Box, vec::Vec};
 
 entry_point!(start);
 fn start(boot_info: &'static BootInfo) -> ! {
-    kernel::init();
+    kernel::init(boot_info);
+    main();
+}
 
-    let pmem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    let mut mapper = unsafe { vmem::init(pmem_offset) };
-    let mut frame_allocator = unsafe { vmem::BootInfoFrameAllocator::new(&boot_info.memory_map) };
-    unsafe { 
-        heap::init(&mut mapper, &mut frame_allocator)
-            .expect("failed to init kernel heap");
-    }
-
+fn main() -> !{
     test_main();
     kernel::halt()
 }
@@ -46,12 +41,24 @@ fn vector() {
 }
 
 #[test_case]
+fn big_allocations() {
+    const EMPTY : Vec<u8> = Vec::new();
+    let mut x : [Vec<u8>; 10] = [EMPTY; 10];
+    for i in 0.. 20 {
+        for i in 0 .. x.len() {
+            x[i] = Vec::with_capacity(4*pache::KiB);
+        }
+    }
+}
+
+#[test_case]
 fn many_boxes() {
     for i in 0..kernel::heap::HEAP_SIZE {
         let x = Box::new(i);
         assert_eq!(*x, i);
     }
 }
+
 
 
 #[panic_handler]

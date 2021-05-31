@@ -23,7 +23,8 @@ fn start(boot_info: &'static BootInfo) -> ! {
         test_main();
         kernel::halt()
     } else {
-        kernel::main(boot_info);
+        kernel::init(boot_info);
+        kernel::main()
     }
 }
 

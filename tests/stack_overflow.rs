@@ -1,11 +1,13 @@
 #![no_std]
 #![no_main]
 #![feature(abi_x86_interrupt)]
+#![feature(default_alloc_error_handler)]
 
 use core::panic::PanicInfo;
 use lazy_static::lazy_static;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
-use kernel::{self, gdt, print, println, exit_qemu, QEMU_SUCCESS};
+use kernel::{self, GlobalResource, gdt
+            , gdt::Gdt, print, println, exit_qemu, QEMU_SUCCESS};
 
 lazy_static! {
     static ref TEST_IDT: InterruptDescriptorTable = {
@@ -40,7 +42,7 @@ fn stack_overflow() {
 pub extern "C" fn _start() -> ! {
     print!("stack_overflow::stack_overflow... ");
 
-    gdt::init();
+    Gdt::init();
     init_test_idt();
 
     stack_overflow();

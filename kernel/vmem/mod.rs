@@ -1,13 +1,14 @@
 pub mod paging;
 
-use core::usize;
+use core::ops::Range;
 
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 use x86_64::structures::paging::{FrameAllocator, OffsetPageTable, PhysFrame, Size4KiB};
-use x86_64::{PhysAddr, VirtAddr}; 
+use x86_64::{PhysAddr, VirtAddr};
 
 use crate::info;
 use paging::PAGE_SIZE;
+use pache::MiB;
 
 
 /// init a new OffsetPageTable with the l4frame's physical addr and the offset.
@@ -16,13 +17,13 @@ use paging::PAGE_SIZE;
 /// Also, only call once because of `&mut` aliasing.
 pub unsafe fn init(pmem_offset: VirtAddr) -> OffsetPageTable<'static> {
     info!("identity mapping at offset {:p}", pmem_offset);
-    let phys = l4frame().start_address();
+    let phys = pl4frame().start_address();
     let virt : VirtAddr = pmem_offset + phys.as_u64();
     info!("mapping PL4: V{:p} -> P{:p}", virt, phys);
     OffsetPageTable::new(&mut *(virt.as_mut_ptr()), pmem_offset)
 }
 
-fn l4frame() -> PhysFrame {
+fn pl4frame() -> PhysFrame {
     use x86_64::registers::control::Cr3;
     Cr3::read().0
 }
@@ -60,17 +61,20 @@ impl BootInfoFrameAllocator {
                  , region.region_type );
         }
         BootInfoFrameAllocator {
-            memory_map, 
+            memory_map,
             next: 0
         }
     }
     // FIXME this sucks, we should (1) cache this and (2) deallocate pages
     fn usable_frames(&self) -> impl Iterator<Item = PhysFrame> {
-        self.memory_map.iter() 
+        fn filter_by_size(start: u64, end: u64) -> Option<Range<u64>> {
+            (end - start > 2 * MiB as u64).then(||start .. end)
+        }
+        self.memory_map.iter()
             // get usable regions
             .filter(|r| r.region_type == MemoryRegionType::Usable)
             // map each region to its address range
-            .map(|r| r.range.start_addr() .. r.range.end_addr())
+            .filter_map(|r| filter_by_size(r.range.start_addr() , r.range.end_addr()))
             // transform to an iterator of frame start addresses
             .flat_map(|r| r.step_by(PAGE_SIZE))
             // create `PhysFrame`s from the start addresses
