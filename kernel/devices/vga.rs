@@ -1,38 +1,38 @@
 #![allow(dead_code)]
 use core::fmt;
-use volatile::Volatile;
+use core::mem;
 use lazy_static::lazy_static;
 use spin::mutex::Mutex;
+use volatile::Volatile;
 use x86_64::instructions::interrupts;
-use core::mem;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum Colour
-  { Black = 0
-  , Blue
-  , Green
-  , Cyan
-  , Red
-  , Magenta
-  , Brown
-  , LightGray
-  , DarkGray
-  , LightBlue
-  , LightGreen
-  , LightCyan
-  , LightRed
-  , Pink
-  , Yellow
-  , White
-  }
+pub enum Colour {
+    Black = 0,
+    Blue,
+    Green,
+    Cyan,
+    Red,
+    Magenta,
+    Brown,
+    LightGray,
+    DarkGray,
+    LightBlue,
+    LightGreen,
+    LightCyan,
+    LightRed,
+    Pink,
+    Yellow,
+    White,
+}
 impl Colour {
     #[inline]
     pub fn as_u8(self) -> u8 {
         self as u8
     }
     #[inline]
-    pub fn from_u8(num : u8) -> Colour {
+    pub fn from_u8(num: u8) -> Colour {
         if num > Colour::White.as_u8() {
             Colour::White
         } else {
@@ -66,13 +66,16 @@ impl ColourCode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
-struct ScChar
-  { ascii_char: u8
-  , colour_code: ColourCode
-  }
+struct ScChar {
+    ascii_char: u8,
+    colour_code: ColourCode,
+}
 impl ScChar {
     pub fn blank(colour_code: ColourCode) -> ScChar {
-        ScChar { ascii_char: b' ', colour_code }
+        ScChar {
+            ascii_char: b' ',
+            colour_code,
+        }
     }
 }
 
@@ -82,21 +85,21 @@ const BUFFER_WIDTH: usize = 80;
 #[repr(transparent)]
 pub struct Buffer([[Volatile<ScChar>; BUFFER_WIDTH]; BUFFER_HEIGHT]);
 
-pub struct Writer
-  { pub col: usize
-  , pub row: usize
-  , pub colour_code: ColourCode
-  , pub buffer: &'static mut Buffer
-  }
+pub struct Writer {
+    pub col: usize,
+    pub row: usize,
+    pub colour_code: ColourCode,
+    pub buffer: &'static mut Buffer,
+}
 lazy_static! {
-pub static ref VGA_WRITER : Mutex<Writer> = {
+    pub static ref VGA_WRITER: Mutex<Writer> = {
         let addr = 0xb8000;
         crate::info!("loading VGA buffer @ 0x{:x}", addr);
         Mutex::new(Writer {
             col: 0,
             row: 0,
             colour_code: ColourCode::new(Colour::Yellow, Colour::Black),
-            buffer: unsafe {&mut *(addr as *mut Buffer)}
+            buffer: unsafe { &mut *(addr as *mut Buffer) },
         })
     };
 }
@@ -120,7 +123,10 @@ impl Writer {
                 let col = self.col;
 
                 let colour_code = self.colour_code;
-                self.buffer.0[row][col].write(ScChar { ascii_char: byte, colour_code });
+                self.buffer.0[row][col].write(ScChar {
+                    ascii_char: byte,
+                    colour_code,
+                });
                 self.col += 1;
             }
         }
@@ -144,9 +150,9 @@ impl Writer {
         }
         self.row = BUFFER_HEIGHT - 1;
 
-        for r in 1.. BUFFER_HEIGHT {
+        for r in 1..BUFFER_HEIGHT {
             for c in 0..BUFFER_WIDTH {
-                self.buffer.0[r-1][c].write(self.buffer.0[r][c].read());
+                self.buffer.0[r - 1][c].write(self.buffer.0[r][c].read());
             }
         }
         self.clear_row(self.row);
@@ -191,7 +197,7 @@ macro_rules! vgaeprintln {
 #[doc(hidden)]
 pub fn _vgaprint(args: fmt::Arguments) {
     use core::fmt::Write;
-    interrupts::without_interrupts(||{
+    interrupts::without_interrupts(|| {
         VGA_WRITER.lock().write_fmt(args).unwrap();
     });
 }

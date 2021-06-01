@@ -1,11 +1,9 @@
 #![no_std]
 #![no_main]
-#![feature( custom_test_frameworks
-          , default_alloc_error_handler
-          )]
+#![feature(custom_test_frameworks, default_alloc_error_handler)]
 
 use core::panic::PanicInfo;
-use kernel::{QEMU_FAILURE, QEMU_SUCCESS, exit_qemu, println, print};
+use kernel::{exit_qemu, print, println, QEMU_FAILURE, QEMU_SUCCESS};
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {

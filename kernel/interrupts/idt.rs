@@ -1,28 +1,33 @@
-use crate::info;
 use crate::gdt;
-use crate::interrupts::pic::{IRQ};
-use x86_64::structures::idt::{HandlerFunc, InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
+use crate::info;
+use crate::interrupts::pic::IRQ;
 use lazy_static::lazy_static;
+use x86_64::structures::idt::{
+    HandlerFunc, InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode,
+};
 
-const IRQ_HANDLERS: [(IRQ, HandlerFunc); 2] =
-    [ (IRQ::Timer, timer_handler)
-    , (IRQ::Keyboard, keyboard_handler)
-    ];
+const IRQ_HANDLERS: [(IRQ, HandlerFunc); 2] = [
+    (IRQ::Timer, timer_handler),
+    (IRQ::Keyboard, keyboard_handler),
+];
 
 pub fn init_idt() {
-    lazy_static! { pub static ref IDT: InterruptDescriptorTable = {
-        let mut idt = InterruptDescriptorTable::new();
-        idt.breakpoint.set_handler_fn(breakpoint_handler);
-        unsafe {
-            idt.double_fault.set_handler_fn(double_fault_handler)
-                .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
-        }
-        idt.page_fault.set_handler_fn(page_fault_handler);
-        for (irq, handler) in IRQ_HANDLERS {
-            idt[irq.as_usize()].set_handler_fn(handler);
-        }
-        idt
-    };}
+    lazy_static! {
+        pub static ref IDT: InterruptDescriptorTable = {
+            let mut idt = InterruptDescriptorTable::new();
+            idt.breakpoint.set_handler_fn(breakpoint_handler);
+            unsafe {
+                idt.double_fault
+                    .set_handler_fn(double_fault_handler)
+                    .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
+            }
+            idt.page_fault.set_handler_fn(page_fault_handler);
+            for (irq, handler) in IRQ_HANDLERS {
+                idt[irq.as_usize()].set_handler_fn(handler);
+            }
+            idt
+        };
+    }
     info!("loading IDT");
     IDT.load();
 }
@@ -34,7 +39,12 @@ extern "x86-interrupt" fn double_fault_handler(sf: InterruptStackFrame, _error_c
 }
 extern "x86-interrupt" fn page_fault_handler(sf: InterruptStackFrame, ecode: PageFaultErrorCode) {
     use x86_64::registers::control::Cr2;
-    panic!("EXCEPTION: PAGEFAULT @ 0x{:x} `{:?}`\n{:#?}\n", Cr2::read(), ecode, sf);
+    panic!(
+        "EXCEPTION: PAGEFAULT @ 0x{:x} `{:?}`\n{:#?}\n",
+        Cr2::read(),
+        ecode,
+        sf
+    );
 }
 extern "x86-interrupt" fn timer_handler(_: InterruptStackFrame) {
     unsafe {

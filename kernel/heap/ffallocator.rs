@@ -11,14 +11,16 @@ use crate::locked::Locked;
 #[repr(C)]
 pub struct Region {
     next: *mut Region,
-    size: u64
+    size: u64,
 }
 impl Region {
-    const fn null() -> *mut Region { ptr::null_mut() }
-    fn begin(&self) -> *const Region  {
+    const fn null() -> *mut Region {
+        ptr::null_mut()
+    }
+    fn begin(&self) -> *const Region {
         self as *const Self
     }
-    fn end(&self) -> *const Region  {
+    fn end(&self) -> *const Region {
         (self.begin() as u64 + self.size) as *const Region
     }
 }
@@ -32,10 +34,11 @@ pub struct FFAlloc {
 unsafe impl Sync for FFAlloc {}
 unsafe impl Send for FFAlloc {}
 
-
 impl FFAlloc {
     pub const fn new() -> Self {
-        FFAlloc { free_list : ptr::null_mut() }
+        FFAlloc {
+            free_list: ptr::null_mut(),
+        }
     }
 
     pub unsafe fn init(&mut self, addr: u64, size: u64) {
@@ -46,13 +49,16 @@ impl FFAlloc {
     unsafe fn add_free_region(&mut self, addr: *mut Region, size: u64) {
         assert_eq!(addr.align_up(mem::align_of::<Region>() as u64), addr);
         assert!(size >= mem::size_of::<Region>() as u64);
-        addr.write(Region{ size, next: self.free_list });
+        addr.write(Region {
+            size,
+            next: self.free_list,
+        });
         self.free_list = addr;
     }
-    unsafe fn free_region(&mut self, ptr: NonNull<Region> , size: u64) {
+    unsafe fn free_region(&mut self, ptr: NonNull<Region>, size: u64) {
         ptr.as_ptr().write(Region {
             next: self.free_list,
-            size
+            size,
         });
         self.free_list = ptr.as_ptr();
     }
@@ -68,8 +74,10 @@ impl FFAlloc {
                 let mut hd = unsafe { NonNull::new_unchecked(*hd) };
                 let next = region.next;
                 let ret = unsafe {
-                    Some(( NonNull::new_unchecked(region as *mut Region)
-                         , NonNull::new_unchecked(aligned) ))
+                    Some((
+                        NonNull::new_unchecked(region as *mut Region),
+                        NonNull::new_unchecked(aligned),
+                    ))
                 };
                 let hd_ = unsafe { hd.as_mut() };
                 hd_.next = next;
@@ -81,7 +89,7 @@ impl FFAlloc {
         None
     }
     /// Returns an aligned pointer inside the region
-    fn can_alloc(region: &Region, size: u64, align: u64) -> Option<*mut Region>  {
+    fn can_alloc(region: &Region, size: u64, align: u64) -> Option<*mut Region> {
         let begin = region.begin().align_up(align);
         // avoid overflow => unaddressable space anyways
         let end = (begin as u64).checked_add(size)?;
@@ -99,13 +107,13 @@ impl FFAlloc {
     }
 
     fn size_align(layout: Layout) -> Option<(u64, u64)> {
-        let layout = layout.align_to(mem::align_of::<Region>())
-                        .ok()?
-                        .pad_to_align();
+        let layout = layout
+            .align_to(mem::align_of::<Region>())
+            .ok()?
+            .pad_to_align();
         let size = layout.size().max(mem::size_of::<Region>());
         Some((size as u64, layout.align() as u64))
     }
-
 }
 
 unsafe impl GlobalAlloc for Locked<FFAlloc> {
@@ -114,8 +122,8 @@ unsafe impl GlobalAlloc for Locked<FFAlloc> {
             Some(x) => x,
             None => {
                 // crate::error!("failed on requested alignment: {:?}", layout);
-                return ptr::null_mut()
-            },
+                return ptr::null_mut();
+            }
         };
 
         let mut allocator = self.lock();
@@ -124,8 +132,8 @@ unsafe impl GlobalAlloc for Locked<FFAlloc> {
                 Some(s) => s,
                 None => return ptr::null_mut(),
             };
-            let excess = region.as_ref().end() as u64  - end;
-            if excess > 0  {
+            let excess = region.as_ref().end() as u64 - end;
+            if excess > 0 {
                 allocator.add_free_region(end as *mut Region, excess);
             }
             begin.as_ptr() as *mut u8
@@ -138,7 +146,7 @@ unsafe impl GlobalAlloc for Locked<FFAlloc> {
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
         let ptr = NonNull::new(ptr as *mut Region).expect("dealloc nullptr");
-        let (size, _) =  FFAlloc::size_align(layout).expect("requested alignment failed");
+        let (size, _) = FFAlloc::size_align(layout).expect("requested alignment failed");
         self.lock().free_region(ptr, size);
     }
 }

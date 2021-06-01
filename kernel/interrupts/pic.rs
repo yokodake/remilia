@@ -3,21 +3,21 @@ use core::u8;
 use spin::Mutex;
 
 pub static PICS: Mutex<CascadePic> =
-    Mutex::new(unsafe{ CascadePic::new(MASTER_PIC_OFFSET, SLAVE_PIC_OFFSET)});
+    Mutex::new(unsafe { CascadePic::new(MASTER_PIC_OFFSET, SLAVE_PIC_OFFSET) });
 
 pub fn init_pic() {
     info!("initializing Cascading PIC");
     unsafe { PICS.lock().initialize() };
 }
-pub const MASTER_PIC_OFFSET : u8 = 32;
-pub const SLAVE_PIC_OFFSET : u8 = MASTER_PIC_OFFSET + 8;
+pub const MASTER_PIC_OFFSET: u8 = 32;
+pub const SLAVE_PIC_OFFSET: u8 = MASTER_PIC_OFFSET + 8;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
-pub enum IRQ 
-    { Timer = MASTER_PIC_OFFSET
-    , Keyboard
-    }
+pub enum IRQ {
+    Timer = MASTER_PIC_OFFSET,
+    Keyboard,
+}
 
 impl IRQ {
     #[inline]
@@ -34,26 +34,26 @@ use x86_64::instructions::port::Port;
 
 use crate::info;
 
-const CMD_INIT : u8 = 0x11;
-const CMD_EOI : u8 = 0x20;
-const MODE_86 : u8 = 0x01;
-pub struct CascadePic 
-    { master : Pic
-    , slave : Pic
-    }
+const CMD_INIT: u8 = 0x11;
+const CMD_EOI: u8 = 0x20;
+const MODE_86: u8 = 0x01;
+pub struct CascadePic {
+    master: Pic,
+    slave: Pic,
+}
 impl CascadePic {
-    pub const unsafe fn new(offset_master: u8, offset_slave :u8) -> CascadePic {
+    pub const unsafe fn new(offset_master: u8, offset_slave: u8) -> CascadePic {
         CascadePic {
             master: Pic {
                 command: Port::new(0x20),
                 data: Port::new(0x21),
-                offset: offset_master
+                offset: offset_master,
             },
             slave: Pic {
                 command: Port::new(0xa0),
                 data: Port::new(0xa1),
-                offset: offset_slave
-            }
+                offset: offset_slave,
+            },
         }
     }
     pub unsafe fn initialize(&mut self) {
@@ -87,21 +87,17 @@ impl CascadePic {
 
         // restore masks
         self.write_masks(saved_masks[0], saved_masks[1]);
-
     }
 
     pub unsafe fn read_masks(&mut self) -> [u8; 2] {
-        [ self.master.read_mask()
-        , self.slave.read_mask()
-        ]
+        [self.master.read_mask(), self.slave.read_mask()]
     }
     pub unsafe fn write_masks(&mut self, master_m: u8, slave_m: u8) {
         self.master.write_mask(master_m);
         self.slave.write_mask(slave_m);
     }
     pub fn handles_interrupt(&self, interrupt_id: u8) -> bool {
-        self.master.handles_interrupt(interrupt_id)
-        || self.slave.handles_interrupt(interrupt_id)
+        self.master.handles_interrupt(interrupt_id) || self.slave.handles_interrupt(interrupt_id)
     }
     pub unsafe fn notify_eoi(&mut self, interrupt_id: u8) {
         if self.master.handles_interrupt(interrupt_id) {
@@ -115,12 +111,12 @@ impl CascadePic {
         self.slave.data.write(0xff);
     }
 }
-struct Pic 
-    { command: Port<u8>
-    , data: Port<u8>
-    , /// offset for interrupts mapping
-      offset: u8 
-    }
+struct Pic {
+    command: Port<u8>,
+    data: Port<u8>,
+    /// offset for interrupts mapping
+    offset: u8,
+}
 
 impl Pic {
     // send end of interrupt

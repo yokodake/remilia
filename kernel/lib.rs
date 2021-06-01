@@ -1,10 +1,6 @@
 #![no_std]
 #![cfg_attr(test, no_main)]
-#![feature( custom_test_frameworks
-          , abi_x86_interrupt
-          , format_args_nl
-          , asm
-          )]
+#![feature(custom_test_frameworks, abi_x86_interrupt, format_args_nl, asm)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_harness_main"]
 #![cfg_attr(test, feature(default_alloc_error_handler))]
@@ -13,17 +9,17 @@ extern crate alloc;
 pub mod debug;
 pub mod devices;
 pub mod gdt;
-pub mod interrupts;
-pub mod vmem;
 pub mod heap;
+pub mod interrupts;
 pub mod locked;
+pub mod vmem;
 
-use core::panic::PanicInfo;
-use bootloader::{BootInfo, bootinfo::MemoryMap};
-#[cfg(test)]
-use bootloader::{entry_point};
-use x86_64::VirtAddr;
 use alloc::boxed::Box;
+#[cfg(test)]
+use bootloader::entry_point;
+use bootloader::{bootinfo::MemoryMap, BootInfo};
+use core::panic::PanicInfo;
+use x86_64::VirtAddr;
 
 pub trait GlobalResource {
     fn init();
@@ -32,10 +28,12 @@ pub trait GlobalResource {
 
 pub fn debug_regions(memory_map: &'static MemoryMap) {
     for region in memory_map.iter() {
-        info!( "Multiboot mmap: [0x{:012x} : 0x{:012x}] {:?}"
-                , region.range.start_addr()
-                , region.range.end_addr()
-                , region.region_type );
+        info!(
+            "Multiboot mmap: [0x{:012x} : 0x{:012x}] {:?}",
+            region.range.start_addr(),
+            region.range.end_addr(),
+            region.region_type
+        );
     }
 }
 
@@ -58,10 +56,8 @@ pub fn init(boot_info: &'static BootInfo) {
         }
     };
 
-
     unsafe {
-        heap::init(&mut mapper, &mut bootstrap)
-            .expect("failed to init kernel heap");
+        heap::init(&mut mapper, &mut bootstrap).expect("failed to init kernel heap");
     }
     info!("memory enabled");
 }
@@ -75,7 +71,9 @@ pub fn main() -> ! {
 }
 
 pub fn halt() -> ! {
-    loop { x86_64::instructions::hlt(); }
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
 
 /** TESTING */
@@ -93,7 +91,6 @@ impl<T: Fn()> Testable for T {
         self();
         println!("[ok]");
     }
-
 }
 pub fn test_runner(tests: &[&dyn Testable]) {
     use core::cmp::max;
@@ -134,8 +131,8 @@ fn panic(info: &PanicInfo) -> ! {
     test_panic_handler(info)
 }
 
-pub const QEMU_SUCCESS : u32 = 0x10;
-pub const QEMU_FAILURE : u32 = 0x11;
+pub const QEMU_SUCCESS: u32 = 0x10;
+pub const QEMU_FAILURE: u32 = 0x11;
 pub fn exit_qemu(code: u32) {
     use x86_64::instructions::port::Port;
     unsafe {

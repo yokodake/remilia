@@ -1,9 +1,9 @@
 use core::fmt::Write;
 
-use pache::ansi_term::TermStyle;
-use uart_16550::SerialPort;
-use spin::Mutex;
 use lazy_static::lazy_static;
+use pache::ansi_term::TermStyle;
+use spin::Mutex;
+use uart_16550::SerialPort;
 use x86_64::instructions::interrupts;
 
 pub const SERIAL_PORT_ID: u16 = 0x3f8;

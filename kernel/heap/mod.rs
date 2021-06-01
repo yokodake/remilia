@@ -4,19 +4,18 @@
 
 pub mod ffallocator;
 
-use crate::{info, error, warn};
 use crate::locked::Locked;
-use crate::vmem::paging::{PAGE_SIZE, LPAGE_SIZE};
+use crate::vmem::paging::{LPAGE_SIZE, PAGE_SIZE};
+use crate::{error, info, warn};
+use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
+use ffallocator::FFAlloc;
 use pache::addr::Addr;
 use pache::Range;
-use ffallocator::FFAlloc;
 use pache::{KiB, MiB};
-use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 use x86_64::structures::paging::{
-    FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB, Size2MiB,
-    PhysFrame, mapper::MapToError
+    mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, PhysFrame, Size2MiB, Size4KiB,
 };
-use x86_64::{VirtAddr, PhysAddr};
+use x86_64::{PhysAddr, VirtAddr};
 
 /// addresses starting with 0x69f are in the kernel heap
 pub const HEAP_START: u64 = 0x0069_f000_0000;
@@ -70,7 +69,7 @@ unsafe fn init_global_heap() {
 pub static GLOBAL_HEAP: Locked<FFAlloc> = Locked::new(FFAlloc::new());
 
 // FIXME: variable page size
-#[derive(Clone,Copy,Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct BootstrapFramesAlloc {
     pub srange: [Range<u64>; 2],
     pub snext: u64,
@@ -81,11 +80,11 @@ pub struct BootstrapFramesAlloc {
 impl BootstrapFramesAlloc {
     // FIXME: align_down end_addresses ?
     // FIXME: this is ugly, please rewrite
-    pub fn new(memory_map : &'static MemoryMap) -> Option<Self> {
+    pub fn new(memory_map: &'static MemoryMap) -> Option<Self> {
         let mut small = false;
         let mut large = false;
         let mut allocator = BootstrapFramesAlloc {
-            srange: [ Range::new(u64::MAX, u64::MAX); 2 ],
+            srange: [Range::new(u64::MAX, u64::MAX); 2],
             snext: u64::MAX,
             lrange: Range::new(u64::MAX, u64::MAX),
             lnext: u64::MAX,
@@ -93,31 +92,37 @@ impl BootstrapFramesAlloc {
         };
         for r in memory_map.iter() {
             if small && large {
-                    break;
+                break;
             }
             if r.region_type == MemoryRegionType::Usable {
                 if !large && (r.range.end_addr() - r.range.start_addr() > HEAP_TOTAL_SIZE as u64) {
-                    info!("found suitable large region @ 0x{:08x}-0x{:08x}"
-                          , r.range.start_addr()
-                          , r.range.end_addr());
+                    info!(
+                        "found suitable large region @ 0x{:08x}-0x{:08x}",
+                        r.range.start_addr(),
+                        r.range.end_addr()
+                    );
                     large = true;
                     // FIXME: align_to
                     let size = r.range.start_addr() - r.range.end_addr();
-                    let (small, big, end) = r.range.start_addr()
+                    let (small, big, end) = r
+                        .range
+                        .start_addr()
                         .align_to(r.range.start_addr(), LPAGE_SIZE as u64);
 
-                    allocator.srange[1] =Range::new(small, big);
-                    allocator.lrange =Range::new(big, r.range.end_addr());
+                    allocator.srange[1] = Range::new(small, big);
+                    allocator.lrange = Range::new(big, r.range.end_addr());
                     allocator.lnext = big;
 
                     // FIXME is this correct even if end_addr() is not aligned?
-                    allocator.back = (r.range.end_addr() - PAGE_SIZE as u64)
-                        .align_down(PAGE_SIZE as u64);
+                    allocator.back =
+                        (r.range.end_addr() - PAGE_SIZE as u64).align_down(PAGE_SIZE as u64);
                 } else if !small {
                     small = true;
-                    info!("found a small region @ 0x{:08x}-0x{:08x}"
-                          , r.range.start_addr()
-                          , r.range.end_addr());
+                    info!(
+                        "found a small region @ 0x{:08x}-0x{:08x}",
+                        r.range.start_addr(),
+                        r.range.end_addr()
+                    );
                     allocator.srange[0] = Range::new(r.range.start_addr(), r.range.end_addr());
                     allocator.snext = r.range.start_addr();
                 }

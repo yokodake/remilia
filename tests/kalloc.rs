@@ -6,11 +6,11 @@
 
 extern crate alloc;
 
-use bootloader::{BootInfo, entry_point};
+use alloc::{boxed::Box, vec::Vec};
+use bootloader::{entry_point, BootInfo};
+use core::panic::PanicInfo;
 use kernel::{heap, println, vmem};
 use x86_64::VirtAddr;
-use core::panic::PanicInfo;
-use alloc::{boxed::Box, vec::Vec};
 
 entry_point!(start);
 fn start(boot_info: &'static BootInfo) -> ! {
@@ -18,7 +18,7 @@ fn start(boot_info: &'static BootInfo) -> ! {
     main();
 }
 
-fn main() -> !{
+fn main() -> ! {
     test_main();
     kernel::halt()
 }
@@ -34,7 +34,7 @@ fn simple_box() {
 #[test_case]
 fn vector() {
     let mut v = Vec::new();
-    for i in 0 .. 1000 {
+    for i in 0..1000 {
         v.push(i);
     }
     assert_eq!(v.len(), 1000);
@@ -42,11 +42,11 @@ fn vector() {
 
 #[test_case]
 fn big_allocations() {
-    const EMPTY : Vec<u8> = Vec::new();
-    let mut x : [Vec<u8>; 10] = [EMPTY; 10];
-    for i in 0.. 20 {
-        for i in 0 .. x.len() {
-            x[i] = Vec::with_capacity(4*pache::KiB);
+    const EMPTY: Vec<u8> = Vec::new();
+    let mut x: [Vec<u8>; 10] = [EMPTY; 10];
+    for i in 0..20 {
+        for i in 0..x.len() {
+            x[i] = Vec::with_capacity(4 * pache::KiB);
         }
     }
 }
@@ -58,8 +58,6 @@ fn many_boxes() {
         assert_eq!(*x, i);
     }
 }
-
-
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {

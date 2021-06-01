@@ -4,10 +4,9 @@
 #![feature(default_alloc_error_handler)]
 
 use core::panic::PanicInfo;
+use kernel::{self, exit_qemu, gdt, gdt::Gdt, print, println, GlobalResource, QEMU_SUCCESS};
 use lazy_static::lazy_static;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
-use kernel::{self, GlobalResource, gdt
-            , gdt::Gdt, print, println, exit_qemu, QEMU_SUCCESS};
 
 lazy_static! {
     static ref TEST_IDT: InterruptDescriptorTable = {
@@ -26,7 +25,7 @@ pub fn init_test_idt() {
     TEST_IDT.load();
 }
 
-extern "x86-interrupt" fn test_double_fault_handler(_: InterruptStackFrame, _:u64) -> ! {
+extern "x86-interrupt" fn test_double_fault_handler(_: InterruptStackFrame, _: u64) -> ! {
     println!("[ok]");
     exit_qemu(QEMU_SUCCESS);
     kernel::halt()

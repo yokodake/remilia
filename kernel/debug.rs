@@ -42,9 +42,9 @@ macro_rules! println {
         ($crate::print!(concat!($fmt, "\n"), $($arg)*));
 }
 
-pub const INFO_STYLE : TermStyle = TermStyle::fg(TermColour::Cyan);
-pub const WARN_STYLE : TermStyle = TermStyle::fg(TermColour::Yellow);
-pub const ERROR_STYLE : TermStyle = TermStyle::fg(TermColour::Red).with_mode(TermGMode::Bold);
+pub const INFO_STYLE: TermStyle = TermStyle::fg(TermColour::Cyan);
+pub const WARN_STYLE: TermStyle = TermStyle::fg(TermColour::Yellow);
+pub const ERROR_STYLE: TermStyle = TermStyle::fg(TermColour::Red).with_mode(TermGMode::Bold);
 
 #[macro_export]
 macro_rules! _println_style {

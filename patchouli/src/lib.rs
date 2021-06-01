@@ -12,7 +12,7 @@ use core::fmt;
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Range<T> {
     pub start: T,
-    pub end: T
+    pub end: T,
 }
 
 impl<T> Range<T> {
@@ -21,7 +21,7 @@ impl<T> Range<T> {
     }
 }
 
-impl<T : PartialOrd<T>> Range<T> {
+impl<T: PartialOrd<T>> Range<T> {
     pub fn contains(&self, i: T) -> bool {
         self.start <= i && i < self.end
     }

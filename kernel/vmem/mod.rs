@@ -7,9 +7,8 @@ use x86_64::structures::paging::{FrameAllocator, OffsetPageTable, PhysFrame, Siz
 use x86_64::{PhysAddr, VirtAddr};
 
 use crate::info;
-use paging::PAGE_SIZE;
 use pache::MiB;
-
+use paging::PAGE_SIZE;
 
 /// init a new OffsetPageTable with the l4frame's physical addr and the offset.
 ///
@@ -18,7 +17,7 @@ use pache::MiB;
 pub unsafe fn init(pmem_offset: VirtAddr) -> OffsetPageTable<'static> {
     info!("identity mapping at offset {:p}", pmem_offset);
     let phys = pl4frame().start_address();
-    let virt : VirtAddr = pmem_offset + phys.as_u64();
+    let virt: VirtAddr = pmem_offset + phys.as_u64();
     info!("mapping PL4: V{:p} -> P{:p}", virt, phys);
     OffsetPageTable::new(&mut *(virt.as_mut_ptr()), pmem_offset)
 }
@@ -55,26 +54,29 @@ impl BootInfoFrameAllocator {
     pub unsafe fn new(memory_map: &'static MemoryMap) -> Self {
         #[cfg(not(release))]
         for region in memory_map.iter() {
-            info!( "Multiboot mmap: [0x{:012x} : 0x{:012x}] {:?}"
-                 , region.range.start_addr()
-                 , region.range.end_addr()
-                 , region.region_type );
+            info!(
+                "Multiboot mmap: [0x{:012x} : 0x{:012x}] {:?}",
+                region.range.start_addr(),
+                region.range.end_addr(),
+                region.region_type
+            );
         }
         BootInfoFrameAllocator {
             memory_map,
-            next: 0
+            next: 0,
         }
     }
     // FIXME this sucks, we should (1) cache this and (2) deallocate pages
     fn usable_frames(&self) -> impl Iterator<Item = PhysFrame> {
         fn filter_by_size(start: u64, end: u64) -> Option<Range<u64>> {
-            (end - start > 2 * MiB as u64).then(||start .. end)
+            (end - start > 2 * MiB as u64).then(|| start..end)
         }
-        self.memory_map.iter()
+        self.memory_map
+            .iter()
             // get usable regions
             .filter(|r| r.region_type == MemoryRegionType::Usable)
             // map each region to its address range
-            .filter_map(|r| filter_by_size(r.range.start_addr() , r.range.end_addr()))
+            .filter_map(|r| filter_by_size(r.range.start_addr(), r.range.end_addr()))
             // transform to an iterator of frame start addresses
             .flat_map(|r| r.step_by(PAGE_SIZE as usize))
             // create `PhysFrame`s from the start addresses
