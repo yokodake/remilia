@@ -4,7 +4,6 @@
 
 pub mod ffallocator;
 
-use core::ops::Range;
 use crate::{info, error, warn};
 use crate::locked::Locked;
 use crate::vmem::paging::{PAGE_SIZE, LPAGE_SIZE};
@@ -20,12 +19,12 @@ use x86_64::structures::paging::{
 use x86_64::{VirtAddr, PhysAddr};
 
 /// addresses starting with 0x69f are in the kernel heap
-pub const HEAP_START: usize = 0x0069_f000_0000;
-pub const HEAP_SIZE: usize = 2 * MiB;
+pub const HEAP_START: u64 = 0x0069_f000_0000;
+pub const HEAP_SIZE: u64 = 2 * MiB;
 /// addresses starting with 0x69e are in the eternal heap
-pub const HEAP_ETERNAL_START: usize = HEAP_START - HEAP_ETERNAL_SIZE;
-pub const HEAP_ETERNAL_SIZE: usize = 512 * KiB;
-pub const HEAP_TOTAL_SIZE: usize = HEAP_SIZE + HEAP_ETERNAL_SIZE;
+pub const HEAP_ETERNAL_START: u64 = HEAP_START - HEAP_ETERNAL_SIZE;
+pub const HEAP_ETERNAL_SIZE: u64 = 512 * KiB;
+pub const HEAP_TOTAL_SIZE: u64 = HEAP_SIZE + HEAP_ETERNAL_SIZE;
 
 /// initializes the heap by mapping pages.
 pub fn init(
@@ -86,9 +85,9 @@ impl BootstrapFramesAlloc {
         let mut small = false;
         let mut large = false;
         let mut allocator = BootstrapFramesAlloc {
-            srange: [ u64::MAX .. u64::MAX, u64::MAX .. u64::MAX ],
+            srange: [ Range::new(u64::MAX, u64::MAX); 2 ],
             snext: u64::MAX,
-            lrange: u64::MAX .. u64::MAX,
+            lrange: Range::new(u64::MAX, u64::MAX),
             lnext: u64::MAX,
             back: u64::MAX,
         };
@@ -107,8 +106,8 @@ impl BootstrapFramesAlloc {
                     let (small, big, end) = r.range.start_addr()
                         .align_to(r.range.start_addr(), LPAGE_SIZE as u64);
 
-                    allocator.srange[1] = small .. big;
-                    allocator.lrange = big .. r.range.end_addr();
+                    allocator.srange[1] =Range::new(small, big);
+                    allocator.lrange =Range::new(big, r.range.end_addr());
                     allocator.lnext = big;
 
                     // FIXME is this correct even if end_addr() is not aligned?
@@ -119,7 +118,7 @@ impl BootstrapFramesAlloc {
                     info!("found a small region @ 0x{:08x}-0x{:08x}"
                           , r.range.start_addr()
                           , r.range.end_addr());
-                    allocator.srange[0] = r.range.start_addr() .. r.range.end_addr();
+                    allocator.srange[0] = Range::new(r.range.start_addr(), r.range.end_addr());
                     allocator.snext = r.range.start_addr();
                 }
             }
@@ -128,7 +127,7 @@ impl BootstrapFramesAlloc {
             if !small {
                 warn!("no small region found for bootstrapping the heap.");
             }
-            allocator.srange.sort();
+            allocator.srange.sort_unstable_by_key(|r| r.start);
             Some(allocator)
         } else {
             error!("no suitable region found for bootstrapping the heap.");

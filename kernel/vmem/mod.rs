@@ -76,7 +76,7 @@ impl BootInfoFrameAllocator {
             // map each region to its address range
             .filter_map(|r| filter_by_size(r.range.start_addr() , r.range.end_addr()))
             // transform to an iterator of frame start addresses
-            .flat_map(|r| r.step_by(PAGE_SIZE))
+            .flat_map(|r| r.step_by(PAGE_SIZE as usize))
             // create `PhysFrame`s from the start addresses
             .map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
     }

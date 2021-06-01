@@ -1,7 +1,6 @@
 pub use x86_64::{PhysAddr,VirtAddr};
 use core::ops::{Range, Add, Sub};
 
-
 pub trait Addr {
     /// Returns smallest value <= addr, aligned on `align`
     fn align_down<T: Into<u64>>(self, align: T) -> Self where Self:Sized;
@@ -56,27 +55,55 @@ where T : Into<u64> + From<u64> + Add<T, Output = T > + Sub<T, Output = T> + Add
 }
 
 impl Addr for u64 {
-    /// Returns smallest value <= addr, aligned on `align`
+    #[inline]
     fn align_down<T: Into<u64>>(self, align: T) -> Self {
         let align = align.into();
         self & !(align - 1)
     }
-
-    /// Returns smallest value >= addr, aligned on `align`
+    #[inline]
     fn align_up<T: Into<u64>>(self, align: T) -> Self {
         let align = align.into();
         (self + align - 1) & !(align - 1)
     }
 }
+impl Addr for usize {
+    #[inline]
+    fn align_down<T: Into<u64>>(self, align: T) -> Self {
+        (self as u64).align_down(align) as usize
+    }
+    #[inline]
+    fn align_up<T: Into<u64>>(self, align: T) -> Self {
+        (self as u64).align_up(align) as usize
+    }
+}
 
 impl<T> Addr for *const T  {
+    #[inline]
     fn align_down<U: Into<u64>>(self, align: U) -> Self {
         let align = align.into();
         ((self as u64) & !(align - 1)) as *const T
     }
-    fn align_up<U: Into<u64>>(self , align: U) -> *const T {
+    #[inline]
+    fn align_up<U: Into<u64>>(self , align: U) -> Self {
         let align = align.into();
         ((self as u64 + align - 1) & !(align - 1)) as *const T
+    }
+}
+
+impl Addr for PhysAddr {
+    fn align_down<U: Into<u64>>(self, align: U) -> Self {
+        self.align_down(align)
+    }
+    fn align_up<U: Into<u64>>(self , align: U) -> Self {
+        self.align_up(align)
+    }
+}
+impl Addr for VirtAddr {
+    fn align_down<U: Into<u64>>(self, align: U) -> Self {
+        self.align_down(align)
+    }
+    fn align_up<U: Into<u64>>(self , align: U) -> Self {
+        self.align_up(align)
     }
 }
 
