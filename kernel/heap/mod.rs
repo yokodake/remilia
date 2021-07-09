@@ -1,6 +1,8 @@
 //! TODO: expand the heap when we run out.
 pub mod ffallocator;
 
+use core::fmt;
+
 use crate::locked::Locked;
 use crate::vmem::paging::{LPAGE_SIZE, PAGE_SIZE};
 use crate::{error, info, warn};
@@ -10,14 +12,15 @@ use pache::addr::Addr;
 use pache::Range;
 use pache::{KiB, MiB};
 use x86_64::structures::paging::{
-    mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, PhysFrame, Size2MiB, Size4KiB,
+    mapper::MapToError, FrameAllocator, Mapper, Page, PageSize, PageTableFlags, PhysFrame,
+    Size2MiB, Size4KiB,
 };
 use x86_64::{PhysAddr, VirtAddr};
 
 /// addresses starting with 0x69f are in the kernel heap
 pub const HEAP_START: u64 = 0x0069_f000_0000;
 pub const HEAP_SIZE: u64 = 2 * MiB;
-/// addresses starting with 0x69e are in the eternal heap
+/// addresses starting with 0x69e are in the eternal heap, BOTH HEAPS MUST BE CONTIGUOUS
 pub const HEAP_ETERNAL_START: u64 = HEAP_START - HEAP_ETERNAL_SIZE;
 pub const HEAP_ETERNAL_SIZE: u64 = 512 * KiB;
 pub const HEAP_ETERNAL_END: u64 = HEAP_START;
@@ -28,24 +31,27 @@ pub fn init(
     mapper: &mut impl Mapper<Size4KiB>,
     frame_allocator: &mut BootstrapFramesAlloc,
 ) -> Result<(), MapToError<Size4KiB>> {
+    // TODO use a mix of large and small pages
     info!(
         "initializing kernel heap @ {:012p}...",
         VirtAddr::new(HEAP_START as u64)
     );
-    let page_range = {
-        let heap_start = VirtAddr::new(HEAP_START as u64);
+    let small_range = {
+        // eternal and normal heap are contiguous
+        let heap_start = VirtAddr::new(HEAP_ETERNAL_START);
         let heap_end = heap_start + HEAP_SIZE - 1u64;
         let heap_start_page = Page::containing_address(heap_start);
         let heap_end_page = Page::containing_address(heap_end);
         Page::range_inclusive(heap_start_page, heap_end_page)
     };
 
-    for page in page_range {
+    for page in small_range {
         let frame = frame_allocator
             .allocate_frame()
             .ok_or(MapToError::FrameAllocationFailed)?;
+        info!("{:?} -> {:?}", page.start_address(), frame.start_address());
         let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
-        unsafe { mapper.map_to(page, frame, flags, frame_allocator)?.flush() };
+        unsafe { Mapper::<Size4KiB>::map_to(mapper, page, frame, flags, frame_allocator)?.flush() };
     }
 
     unsafe {
@@ -68,7 +74,7 @@ unsafe fn init_global_heap() {
 pub static GLOBAL_HEAP: Locked<FFAlloc> = Locked::new(FFAlloc::new());
 
 /// the frame allocate to bootstrap the kernel heap
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct BootstrapFramesAlloc {
     pub srange: [Range<u64>; 2],
     pub snext: u64,
@@ -82,7 +88,7 @@ impl BootstrapFramesAlloc {
     //        there's also the assumption that the memory map will have two available regions
     //        please rewrite
     // TODO: the eternal heap
-    pub fn new(memory_map: &'static MemoryMap) -> Option<Self> {
+    pub unsafe fn new(memory_map: &'static MemoryMap) -> Option<Self> {
         let mut small = false;
         let mut large = false;
         // we use two regions: one with small pages, another with large pages
@@ -149,36 +155,52 @@ impl BootstrapFramesAlloc {
 
     /// pop a small page region (the page is not mapped)
     pub fn pop_region(&mut self) -> Option<PhysFrame<Size4KiB>> {
-        // REFACTOR
-        // FIXME: what if end is unaligned but smaller than cap
-        if !self.srange.iter().any(|r| r.contains(self.snext)) {
+        let i = self.srange.iter().position(|r| r.contains(self.snext));
+        if i.is_none() {
             // allocate from the back;
             let addr = self.back;
-            if addr <= self.lnext {
+            if addr - PAGE_SIZE <= self.lnext {
                 error!("Out of physical memory. Time to download more RAM.");
             }
             self.back -= PAGE_SIZE as u64;
-            return Some(PhysFrame::containing_address(PhysAddr::new(addr)));
+            return Self::atof(PhysAddr::new(addr));
         }
 
-        let addr = PhysAddr::new(self.snext);
-        if self.srange[0].contains(self.snext) {
-            self.snext += PAGE_SIZE as u64;
-            if !self.srange[0].contains(self.snext) {
-                self.snext = self.srange[1].start;
-            }
+        let frame = Self::atof(PhysAddr::new(self.snext));
+        self.snext += PAGE_SIZE as u64;
+
+        let i = i.unwrap();
+
+        // if we exceeded the range && we were not in the last range
+        if !self.srange[i].contains(self.snext) && i < self.srange.len() - 1 {
+            self.snext = self.srange[i + 1].start;
         }
-        Some(PhysFrame::containing_address(addr))
+        // if we were in the last range, we don't have to do anything anymore
+        // as the start of the function will take care of using frames from the back
+
+        frame
     }
     /// pop a large page region (the page is not mapped)
     pub fn pop_large(&mut self) -> Option<PhysFrame<Size2MiB>> {
-        if self.lnext >= self.back {
+        assert!(<Size2MiB as PageSize>::SIZE == LPAGE_SIZE); // TODO move this to tests
+        if self.lnext + LPAGE_SIZE >= self.back {
+            error!("Out of physical memory for Large Pages.");
             return None;
         }
 
         let addr = PhysAddr::new(self.lnext);
         self.lnext += LPAGE_SIZE as u64;
-        Some(PhysFrame::containing_address(addr))
+        Self::atof(addr)
+    }
+    /// (phys) addr to frame
+    fn atof<S: PageSize>(addr: PhysAddr) -> Option<PhysFrame<S>> {
+        PhysFrame::from_start_address(addr).map_or_else(
+            |_| {
+                error!("{:p} not aligned to physframe", addr);
+                None
+            },
+            Some,
+        )
     }
 }
 
@@ -190,6 +212,24 @@ unsafe impl FrameAllocator<Size4KiB> for BootstrapFramesAlloc {
 unsafe impl FrameAllocator<Size2MiB> for BootstrapFramesAlloc {
     fn allocate_frame(&mut self) -> Option<PhysFrame<Size2MiB>> {
         self.pop_large()
+    }
+}
+
+struct AsHex(pub u64);
+impl fmt::Debug for AsHex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!("{:x}", self.0))
+    }
+}
+impl fmt::Debug for BootstrapFramesAlloc {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BootstrapFramesAlloc")
+            .field("srange", &format_args!("{:#x?}", self.srange))
+            .field("snext", &format_args!("{:#x}", self.snext))
+            .field("lrange", &format_args!("{:#x?}", self.lrange))
+            .field("lnext", &format_args!("{:#x}", self.lnext))
+            .field("back", &format_args!("{:#x}", self.back))
+            .finish()
     }
 }
 

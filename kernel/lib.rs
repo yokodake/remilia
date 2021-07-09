@@ -48,14 +48,13 @@ pub fn init(boot_info: &'static BootInfo) {
     let pmem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { vmem::init(pmem_offset) };
     debug_regions(&boot_info.memory_map);
-    let mut bootstrap = match BootstrapFramesAlloc::new(&boot_info.memory_map) {
+    let mut bootstrap = match unsafe { BootstrapFramesAlloc::new(&boot_info.memory_map) } {
         Some(x) => x,
         None => {
             error!("Could not find enough memory for initial heap");
             panic!()
         }
     };
-
     heap::init(&mut mapper, &mut bootstrap).expect("failed to init kernel heap");
     info!("memory enabled");
 }
