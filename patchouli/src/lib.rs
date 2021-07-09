@@ -29,7 +29,7 @@ impl<T: PartialOrd<T>> Range<T> {
 
 impl<T: fmt::Debug> fmt::Debug for Range<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "(");
+        write!(fmt, "(")?;
         self.start.fmt(fmt)?;
         write!(fmt, " .. ")?;
         self.end.fmt(fmt)?;
