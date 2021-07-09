@@ -19,7 +19,7 @@ RSFLAGS= --target $(TARGET_JSON) $(ZFLAGS)
 
 .PHONY: build
 
-run:
+run: build
 	CARGO_MANIFEST_DIR=$(PWD) bootimage runner "$(TARGET_DIR)/$(KERNEL_IMAGE)"
 
 build:

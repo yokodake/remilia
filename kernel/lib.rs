@@ -56,9 +56,7 @@ pub fn init(boot_info: &'static BootInfo) {
         }
     };
 
-    unsafe {
-        heap::init(&mut mapper, &mut bootstrap).expect("failed to init kernel heap");
-    }
+    heap::init(&mut mapper, &mut bootstrap).expect("failed to init kernel heap");
     info!("memory enabled");
 }
 

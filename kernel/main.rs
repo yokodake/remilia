@@ -15,10 +15,8 @@ extern crate alloc;
 entry_point!(start);
 
 fn start(boot_info: &'static BootInfo) -> ! {
-    kernel::info!("{:p}", &start);
-    let p: *const u8 = 0 as *const u8;
-    let y: &*const u8 = &p;
-    let z: *const &*const u8 = (&y) as *const &*const u8;
+    kernel::info!("{:p}", start as fn(_) -> _);
+
     if cfg!(test) {
         #[cfg(test)]
         test_main();
