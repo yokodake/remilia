@@ -304,6 +304,5 @@ pub fn eternal_alloc<T>(size: u64) -> *mut T {
             return allocator.swap(ptr + size) as *mut T;
         }
     }
-    crate::error!("OUT OF ETERNAL MEMORY");
     ptr::null_mut()
 }
