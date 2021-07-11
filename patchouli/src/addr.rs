@@ -64,6 +64,8 @@ where
     fn align_to<U: Into<u64>>(self, align: U) -> (Self, Self, Self) {
         let size = self.start - self.end;
         let (s, a, e) = self.start.align_to(size, align);
+        // FIXME
+        assert!(false);
         (s..(a - s), a..(e - a), e..self.end)
     }
 }

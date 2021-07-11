@@ -5,73 +5,119 @@ use core::fmt;
 
 use crate::locked::Locked;
 use crate::vmem::paging::{LPAGE_SIZE, PAGE_SIZE};
-use crate::{error, info, warn};
+use crate::{error, info, warn, dbg};
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 use ffallocator::FFAlloc;
 use pache::addr::Addr;
 use pache::Range;
 use pache::{KiB, MiB};
 use x86_64::structures::paging::{
-    mapper::MapToError, FrameAllocator, Mapper, Page, PageSize, PageTableFlags, PhysFrame,
-    Size2MiB, Size4KiB,
+    mapper::MapToError, page::PageRange, FrameAllocator, Mapper, Page, PageSize, PageTableFlags,
+    PhysFrame, Size2MiB, Size4KiB,
 };
 use x86_64::{PhysAddr, VirtAddr};
 
 /// addresses starting with 0x69f are in the kernel heap
-pub const HEAP_START: u64 = 0x0069_f000_0000;
-pub const HEAP_SIZE: u64 = 2 * MiB;
+pub const KERNEL_HEAP_START: u64 = 0x0069_f000_0000;
+pub const KERNEL_HEAP_SIZE: u64 = (2 * MiB) + (4 * KiB);
+pub const KERNEL_HEAP_END: u64 = KERNEL_HEAP_START + KERNEL_HEAP_SIZE;
 /// addresses starting with 0x69e are in the eternal heap, BOTH HEAPS MUST BE CONTIGUOUS
-pub const HEAP_ETERNAL_START: u64 = HEAP_START - HEAP_ETERNAL_SIZE;
-pub const HEAP_ETERNAL_SIZE: u64 = 512 * KiB;
-pub const HEAP_ETERNAL_END: u64 = HEAP_START;
-pub const HEAP_TOTAL_SIZE: u64 = HEAP_SIZE + HEAP_ETERNAL_SIZE;
+pub const ETERNAL_HEAP_START: u64 = KERNEL_HEAP_START - ETERNAL_HEAP_SIZE;
+pub const ETERNAL_HEAP_SIZE: u64 = 512 * KiB;
+pub const ETERNAL_HEAP_END: u64 = ETERNAL_HEAP_START + ETERNAL_HEAP_SIZE;
+
+pub const TOTAL_HEAP_START: u64 = ETERNAL_HEAP_START;
+pub const TOTAL_HEAP_SIZE: u64 = KERNEL_HEAP_SIZE + ETERNAL_HEAP_SIZE;
+pub const TOTAL_HEAP_END: u64 = KERNEL_HEAP_END;
 
 /// initializes the heap by mapping pages.
-pub fn init(
-    mapper: &mut impl Mapper<Size4KiB>,
+pub fn init<M: Mapper<Size4KiB> + Mapper<Size2MiB>>(
+    mapper: &mut M,
     frame_allocator: &mut BootstrapFramesAlloc,
 ) -> Result<(), MapToError<Size4KiB>> {
-    // TODO use a mix of large and small pages
+    // TODO move these asserts in a better plac
+    assert!(ETERNAL_HEAP_END == KERNEL_HEAP_START);
+    assert!(TOTAL_HEAP_START + TOTAL_HEAP_SIZE == TOTAL_HEAP_END);
+
+    // TODO print info! the ranges
     info!(
         "initializing kernel heap @ {:012p}...",
-        VirtAddr::new(HEAP_START as u64)
+        VirtAddr::new(KERNEL_HEAP_START as u64)
     );
-    let small_range = {
-        // eternal and normal heap are contiguous
-        let heap_start = VirtAddr::new(HEAP_ETERNAL_START);
-        let heap_end = heap_start + HEAP_SIZE - 1u64;
-        let heap_start_page = Page::containing_address(heap_start);
-        let heap_end_page = Page::containing_address(heap_end);
-        Page::range_inclusive(heap_start_page, heap_end_page)
-    };
-
-    for page in small_range {
+    let (prefix, big_start, suffix) = TOTAL_HEAP_START.align_to(TOTAL_HEAP_SIZE, LPAGE_SIZE);
+    let small_ranges = [
+        page_range::<Size4KiB>(prefix, big_start),
+        page_range::<Size4KiB>(suffix, TOTAL_HEAP_END),
+    ];
+    for range in small_ranges {
+        for page in range {
+            let frame = frame_allocator
+                .allocate_frame()
+                .ok_or(MapToError::FrameAllocationFailed)?;
+            let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
+            unsafe {
+                Mapper::<Size4KiB>::map_to(mapper, page, frame, flags, frame_allocator)?.flush()
+            };
+        }
+    }
+    for page in page_range::<Size2MiB>(big_start, suffix) {
         let frame = frame_allocator
             .allocate_frame()
             .ok_or(MapToError::FrameAllocationFailed)?;
-        info!("{:?} -> {:?}", page.start_address(), frame.start_address());
         let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
-        unsafe { Mapper::<Size4KiB>::map_to(mapper, page, frame, flags, frame_allocator)?.flush() };
+        unsafe {
+            Mapper::<Size2MiB>::map_to(mapper, page, frame, flags, frame_allocator)
+                .map_err(map_page_err)?
+                .flush()
+        };
     }
 
     unsafe {
-        init_global_heap();
+        init_kernel_heap();
     }
+    init_eternal_heap();
 
     Ok(())
 }
 
-unsafe fn init_global_heap() {
+/// another reason why the x86_64 library isn't really super good
+fn map_page_err(err: MapToError<Size2MiB>) -> MapToError<Size4KiB> {
+    use x86_64::structures::paging::mapper::MapToError::*;
+    match err {
+        PageAlreadyMapped(frame) => PageAlreadyMapped(unsafe {
+            PhysFrame::from_start_address_unchecked(frame.start_address())
+        }),
+        FrameAllocationFailed => FrameAllocationFailed,
+        ParentEntryHugePage => ParentEntryHugePage,
+    }
+}
+
+/// helper to build page ranges
+fn page_range<S: PageSize>(start_addr: u64, end_addr: u64) -> PageRange<S> {
+    let start = VirtAddr::new(start_addr);
+    let end = VirtAddr::new(end_addr.align_down(S::SIZE));
+    let start_page = Page::containing_address(start);
+    let end_page = Page::containing_address(end);
+    Page::range(start_page, end_page)
+}
+
+unsafe fn init_kernel_heap() {
     info!(
-        "initializing GLOBAL_HEAP @ 0x{:x}; size={}",
-        HEAP_START, HEAP_SIZE
+        "initializing KERNEL_HEAP @ 0x{:x}; size={}",
+        KERNEL_HEAP_START, KERNEL_HEAP_SIZE
     );
-    GLOBAL_HEAP.lock().init(HEAP_START, HEAP_SIZE);
+    KERNEL_HEAP.lock().init(KERNEL_HEAP_START, KERNEL_HEAP_SIZE);
+}
+fn init_eternal_heap() {
+    info!(
+        "initializing ETERNAL_HEAP @ 0x{:x}; size={}",
+        ETERNAL_HEAP_START, ETERNAL_HEAP_SIZE
+    );
 }
 
 // rename to kernel heap
 #[global_allocator]
-pub static GLOBAL_HEAP: Locked<FFAlloc> = Locked::new(FFAlloc::new());
+pub static KERNEL_HEAP: Locked<FFAlloc> = Locked::new(FFAlloc::new());
 
 /// the frame allocate to bootstrap the kernel heap
 #[derive(Clone, Copy)]
@@ -84,10 +130,9 @@ pub struct BootstrapFramesAlloc {
 }
 impl BootstrapFramesAlloc {
     // FIXME: align_down end_addresses ?
-    // FIXME: this is ugly
-    //        there's also the assumption that the memory map will have two available regions
-    //        please rewrite
-    // TODO: the eternal heap
+    // FIXME: this is ugly, please rewrite
+    // TODO: since pop_region supports variable sized we could support more than 1 small region
+    /// SAFETY: memory_map must be valid
     pub unsafe fn new(memory_map: &'static MemoryMap) -> Option<Self> {
         let mut small = false;
         let mut large = false;
@@ -105,8 +150,10 @@ impl BootstrapFramesAlloc {
                 break;
             }
             if r.region_type == MemoryRegionType::Usable {
-                if !large && (r.range.end_addr() - r.range.start_addr() > HEAP_TOTAL_SIZE as u64) {
+                if !large && (r.range.end_addr() - r.range.start_addr() > TOTAL_HEAP_SIZE as u64) {
                     // the region is big enough to contain the entire kernel heap
+                    // which probably isn't needed, since we use small regions too
+                    // but it's a pain to do that computation beforehand
                     info!(
                         "found suitable large region @ 0x{:08x}-0x{:08x}",
                         r.range.start_addr(),
@@ -215,12 +262,6 @@ unsafe impl FrameAllocator<Size2MiB> for BootstrapFramesAlloc {
     }
 }
 
-struct AsHex(pub u64);
-impl fmt::Debug for AsHex {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!("{:x}", self.0))
-    }
-}
 impl fmt::Debug for BootstrapFramesAlloc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BootstrapFramesAlloc")
@@ -242,7 +283,7 @@ pub struct EternalAlloc(u64);
 
 impl EternalAlloc {
     pub const fn new() -> EternalAlloc {
-        EternalAlloc(HEAP_ETERNAL_START)
+        EternalAlloc(ETERNAL_HEAP_START)
     }
     fn swap(&mut self, new: u64) -> u64 {
         let v = self.0;
@@ -259,7 +300,7 @@ pub fn eternal_alloc<T>(size: u64) -> *mut T {
     {
         let mut allocator = ETERNAL_HEAP.lock();
         let ptr = allocator.get();
-        if ptr + size < HEAP_ETERNAL_END {
+        if ptr + size < ETERNAL_HEAP_END {
             return allocator.swap(ptr + size) as *mut T;
         }
     }

@@ -46,14 +46,14 @@ fn big_allocations() {
     let mut x: [Vec<u8>; 10] = [EMPTY; 10];
     for i in 0..20 {
         for i in 0..x.len() {
-            x[i] = Vec::with_capacity(4 * pache::KiB);
+            x[i] = Vec::with_capacity(4 * pache::KiB as usize);
         }
     }
 }
 
 #[test_case]
 fn many_boxes() {
-    for i in 0..kernel::heap::HEAP_SIZE {
+    for i in 0..kernel::heap::KERNEL_HEAP_SIZE {
         let x = Box::new(i);
         assert_eq!(*x, i);
     }
