@@ -1,5 +1,6 @@
 //! first fit allocator
 
+use crate::unreachable;
 use core::alloc::{GlobalAlloc, Layout};
 use core::mem;
 use core::ptr::{self, NonNull};
@@ -130,7 +131,7 @@ unsafe impl GlobalAlloc for Locked<FFAlloc> {
         if let Some((region, begin)) = allocator.pop_region(size, align) {
             let end = match (begin.as_ptr() as u64).checked_add(size) {
                 Some(s) => s,
-                None => return ptr::null_mut(),
+                None => unreachable!(),
             };
             let excess = region.as_ref().end() as u64 - end;
             if excess > 0 {
@@ -139,7 +140,7 @@ unsafe impl GlobalAlloc for Locked<FFAlloc> {
             begin.as_ptr() as *mut u8
         } else {
             // FIXME: try to get a bigger heap?
-            crate::error!("Couldn't find a suitable region to allocate.");
+            crate::warn!("KERNEL HEAP: Couldn't find a suitable region to allocate.");
             ptr::null_mut()
         }
     }

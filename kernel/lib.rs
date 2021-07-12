@@ -1,6 +1,13 @@
 #![no_std]
 #![cfg_attr(test, no_main)]
-#![feature(custom_test_frameworks, abi_x86_interrupt, format_args_nl, asm)]
+#![feature(
+    custom_test_frameworks,
+    abi_x86_interrupt,
+    format_args_nl,
+    asm,
+    allocator_api,
+    nonnull_slice_from_raw_parts
+)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_harness_main"]
 #![cfg_attr(test, feature(default_alloc_error_handler))]
@@ -54,6 +61,18 @@ pub fn init(boot_info: &'static BootInfo) {
     };
     heap::init(&mut mapper, &mut bootstrap).expect("failed to init kernel heap");
     info!("memory enabled");
+
+    dbg!(alloc::alloc::Layout::new::<u8>());
+    dbg!(alloc::alloc::Layout::new::<u16>());
+    dbg!(alloc::alloc::Layout::new::<u32>());
+    dbg!(alloc::alloc::Layout::new::<u64>());
+    dbg!(alloc::alloc::Layout::new::<alloc::vec::Vec<u8>>());
+    dbg!(alloc::alloc::Layout::new::<alloc::vec::Vec<u16>>());
+    dbg!(alloc::alloc::Layout::new::<alloc::vec::Vec<u32>>());
+    dbg!(alloc::alloc::Layout::new::<alloc::vec::Vec<u64>>());
+    dbg!(alloc::alloc::Layout::new::<(u8, u8)>());
+    dbg!(alloc::alloc::Layout::new::<(u8, u64)>());
+    dbg!(alloc::alloc::Layout::new::<(u64, u8)>());
 }
 
 pub fn main() -> ! {

@@ -74,3 +74,13 @@ macro_rules! error {
         ($crate::_println_style!($crate::debug::ERROR_STYLE, $($arg)*));
     };
 }
+
+#[macro_export]
+macro_rules! unreachable {
+    () => {
+        panic!("entered unreachable code!");
+    };
+    ($msg:expr) => {
+        panic!($crate::concat!("entered unreachable code: ", $msg));
+    };
+}
